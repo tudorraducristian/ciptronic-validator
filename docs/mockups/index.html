@@ -28,7 +28,8 @@
       (maximum 5 runde) și completează specificația tehnică. La final, validezi cu poze.
     </p>
 
-    <form class="card" action="/sessions" method="post">
+    <form class="card" action="/sessions" method="post"
+          onsubmit="event.preventDefault(); window.location.href='session.html';">
       <div class="field">
         <label class="field__label" for="product_type">Tip produs</label>
         <select class="select" id="product_type" name="product_type">
