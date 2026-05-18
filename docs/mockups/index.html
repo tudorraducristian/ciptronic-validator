@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Începe o specificare</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">v0.1 · MVP local</span>
+    </div>
+  </header>
+
+  <main class="page page--narrow">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 1/4</strong> — Landing. Ruta: <code>GET /</code>. Formularul trimite la <code>POST /sessions</code>.
+    </div>
+
+    <h1>Începe o specificare nouă</h1>
+    <p>
+      Descrie pe scurt produsul comandat de client. Asistentul îți pune întrebări țintite
+      (maximum 5 runde) și completează specificația tehnică. La final, validezi cu poze.
+    </p>
+
+    <form class="card" action="/sessions" method="post">
+      <div class="field">
+        <label class="field__label" for="product_type">Tip produs</label>
+        <select class="select" id="product_type" name="product_type">
+          <option value="tricou" selected>Tricou</option>
+          <option value="sapca" disabled>Șapcă (în curând)</option>
+          <option value="hanorac" disabled>Hanorac (în curând)</option>
+        </select>
+        <span class="field__hint">Alege tipul; schema specifică va ghida întrebările.</span>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="initial_description">Descriere inițială</label>
+        <textarea
+          class="textarea"
+          id="initial_description"
+          name="initial_description"
+          rows="4"
+          placeholder="ex: O bluză cu logo pe piept stâng, culoare navy, mâneci scurte, material bumbac."
+        >O bluză cu logo pe piept stâng, culoare navy, mâneci scurte.</textarea>
+        <span class="field__hint">Folosește limbajul natural al clientului — nu e nevoie să fie completă.</span>
+      </div>
+
+      <div class="row-actions">
+        <span class="muted" style="font-size: 13px;">Sesiunea se va salva automat în baza locală.</span>
+        <button type="submit" class="btn btn--primary btn--lg">
+          Începe specificare
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </form>
+
+    <div class="divider-label">Cum funcționează</div>
+
+    <div class="card">
+      <ol style="margin: 0; padding-left: 20px; line-height: 1.8; color: var(--c-text-muted); font-size: 14px;">
+        <li><strong>Discovery</strong> — răspunzi la întrebări grupate până specificația e completă (max 5 runde).</li>
+        <li><strong>Upload</strong> — încarci 1–4 poze ale produsului finit.</li>
+        <li><strong>Inspector</strong> — primești un raport cu trei zone: conform, neconform și nevizibil.</li>
+      </ol>
+    </div>
+  </main>
+</body>
+</html>

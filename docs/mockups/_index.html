@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mockup-uri Ciptronic Validator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator — Mockup-uri
+      </a>
+      <span class="topbar__meta">Pre-implementare · validare flow</span>
+    </div>
+  </header>
+
+  <main class="page page--narrow">
+    <h1>Validare flow funcțional</h1>
+    <p>
+      Cele 4 pagini ale aplicației, randate cu date realiste pentru un tricou navy cu logo
+      serigrafiat. Toate sunt statice — nu rulează backend. Navighează în ordinea de mai jos
+      pentru a urmări fluxul end-to-end.
+    </p>
+
+    <ol style="list-style: none; padding: 0; counter-reset: step; margin: var(--s-5) 0;">
+      <li class="card" style="margin-bottom: var(--s-3); counter-increment: step; position: relative;">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">1</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="index.html">Landing — Începe specificare</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Userul alege tipul de produs și scrie o descriere inițială.
+            </p>
+            <span class="badge badge--neutral">GET /</span>
+            <span class="badge badge--neutral">POST /sessions</span>
+          </div>
+        </div>
+      </li>
+
+      <li class="card" style="margin-bottom: var(--s-3); counter-increment: step;">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">2</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="session.html">Discovery — Întrebări iterative</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Checklist read-only (stânga) + max 4 întrebări pe rundă (dreapta). Conține și starea „done”.
+            </p>
+            <span class="badge badge--neutral">GET /sessions/&#123;id&#125;</span>
+            <span class="badge badge--neutral">POST /sessions/&#123;id&#125;/answer</span>
+          </div>
+        </div>
+      </li>
+
+      <li class="card" style="margin-bottom: var(--s-3); counter-increment: step;">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">3</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="validate.html">Upload — 1–4 poze</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Slot obligatoriu + 3 opționale, cu preview thumbnails.
+            </p>
+            <span class="badge badge--neutral">GET /sessions/&#123;id&#125;/validate</span>
+            <span class="badge badge--neutral">POST /sessions/&#123;id&#125;/validate</span>
+          </div>
+        </div>
+      </li>
+
+      <li class="card" style="counter-increment: step;">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">4</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="report.html">Raport — Conform / Neconform / Nevizibil</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Trei zone vizuale distincte, fiecare câmp-frunză al schemei apare exact o dată.
+            </p>
+            <span class="badge badge--neutral">GET /reports/&#123;id&#125;</span>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="divider-label">Sistem de design folosit</div>
+    <div class="card">
+      <dl style="margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: var(--s-2) var(--s-4); font-size: 14px;">
+        <dt class="muted">Pattern</dt><dd>Minimal Single Column</dd>
+        <dt class="muted">Stil</dt><dd>Flat Design (fără shadows, fără gradienturi)</dd>
+        <dt class="muted">Mod</dt><dd>Light, optimizat WCAG AA</dd>
+        <dt class="muted">Fonturi</dt><dd>Lora (serif headings) + Inter (sans body)</dd>
+        <dt class="muted">Accent</dt><dd>verde #16A34A pentru CTA principal</dd>
+        <dt class="muted">Limbă</dt><dd>română, cu diacritice</dd>
+        <dt class="muted">Framework JS</dt><dd>niciunul (HTMX la nivel de atribut)</dd>
+      </dl>
+    </div>
+
+    <p class="muted" style="font-size: 13px; margin-top: var(--s-5);">
+      Banner-ele galbene din partea de sus a fiecărei pagini marchează metadata mockup-ului (rute, stări). În implementarea reală nu apar.
+    </p>
+  </main>
+</body>
+</html>

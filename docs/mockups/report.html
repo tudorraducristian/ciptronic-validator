@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Raport validare</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">Raport <code>r-7a1d...</code> · Tricou</span>
+    </div>
+  </header>
+
+  <main class="page page--wide">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 4/4</strong> — Raport. Ruta: <code>GET /reports/{id}</code>. Total câmpuri raportate: 9 (3 conform + 3 neconform + 3 nevizibil) — fiecare câmp-frunză al schemei apare exact o dată.
+    </div>
+
+    <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--s-3); margin-bottom: var(--s-3);">
+      <h1 style="margin: 0;">Raport validare</h1>
+      <span class="muted" style="font-size: 14px;">Generat la 18 mai 2026, 14:32</span>
+    </div>
+    <p style="margin-bottom: var(--s-6);">
+      Specificație: <strong>tricou navy · slim · guler rotund · mâneci scurte · logo serigrafiat piept stâng (alb, roșu, 10×10 cm)</strong>.
+      3 poze analizate.
+    </p>
+
+    <!-- ============== CONFORM ============== -->
+    <section class="report-zone report-zone--conform" aria-labelledby="zone-conform">
+      <header class="report-zone__header">
+        <span class="report-zone__icon" aria-hidden="true">✓</span>
+        <h2 class="report-zone__title" id="zone-conform">Conform</h2>
+        <span class="report-zone__count">3 câmpuri</span>
+      </header>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">culoare_principala</span>
+          <span class="badge badge--success">încredere: ridicat</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>albastru navy</dd>
+          </div>
+          <div class="report-item__row">
+            <dt>Observat</dt>
+            <dd>albastru navy</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">Culoarea apare consistent în pozele 1 și 2; lumina e uniformă, fără reflexii care să distorsioneze.</p>
+      </article>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">mâneci</span>
+          <span class="badge badge--success">încredere: ridicat</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>scurte</dd>
+          </div>
+          <div class="report-item__row">
+            <dt>Observat</dt>
+            <dd>scurte (cca 22 cm de la umăr)</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">Mâneca dreaptă e clar vizibilă în poza 1, terminație tivită deasupra cotului.</p>
+      </article>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">branding.pozitie</span>
+          <span class="badge badge--success">încredere: ridicat</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>piept stâng</dd>
+          </div>
+          <div class="report-item__row">
+            <dt>Observat</dt>
+            <dd>piept stâng (perspectiva purtătorului)</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">Logo-ul e poziționat pe partea stângă a pieptului în poza 1, la cca 8 cm sub clavicula stângă.</p>
+      </article>
+    </section>
+
+    <!-- ============== NECONFORM ============== -->
+    <section class="report-zone report-zone--neconform" aria-labelledby="zone-neconform">
+      <header class="report-zone__header">
+        <span class="report-zone__icon" aria-hidden="true">✗</span>
+        <h2 class="report-zone__title" id="zone-neconform">Neconform</h2>
+        <span class="report-zone__count">3 câmpuri</span>
+      </header>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">branding.tehnica</span>
+          <span class="badge badge--warn">încredere: mediu</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>serigrafie</dd>
+          </div>
+          <div class="report-item__row">
+            <dt>Observat</dt>
+            <dd>pare DTF (suprafață mat-plastică, neabsorbită în țesătură)</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">În poza 3 (detaliu logo) se vede o textură ridicată cu margini clare, caracteristică DTF — serigrafia ar fi pătruns în țesătură și ar avea margini mai difuze.</p>
+      </article>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">branding.dimensiuni_aproximative</span>
+          <span class="badge badge--warn">încredere: mediu</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>10 cm × 10 cm</dd>
+          </div>
+          <div class="report-item__row">
+            <dt>Observat</dt>
+            <dd>aproximativ 7 cm × 7 cm</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">Raportat la lățimea umărului (~45 cm) în poza 1, logo-ul ocupă cca 7 cm, mai mic decât specificația.</p>
+      </article>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">croială</span>
+          <span class="badge badge--danger">încredere: scăzut</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>slim</dd>
+          </div>
+          <div class="report-item__row">
+            <dt>Observat</dt>
+            <dd>pare regular (linia laterală nu se mulează pe corp)</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">Tricoul e fotografiat pe umeraș, nu purtat — concluzia despre croială are dovezi indirecte. Recomandare: o poză pe corp ar clarifica.</p>
+      </article>
+    </section>
+
+    <!-- ============== NEVIZIBIL ============== -->
+    <section class="report-zone report-zone--nevizibil" aria-labelledby="zone-nevizibil">
+      <header class="report-zone__header">
+        <span class="report-zone__icon" aria-hidden="true">?</span>
+        <h2 class="report-zone__title" id="zone-nevizibil">Nevizibil</h2>
+        <span class="report-zone__count">3 câmpuri</span>
+      </header>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">material</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>bumbac 100%</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">Țesătura nu se vede în prim-plan în niciuna dintre poze; nu pot distinge fibrele. Recomandare: o macro a țesăturii.</p>
+      </article>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">guler</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>rotund</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">În pozele 1 și 2, gulerul e obturat de umeraș. Poza 3 e doar pe logo, nu cuprinde gulerul.</p>
+      </article>
+
+      <article class="report-item">
+        <div class="report-item__head">
+          <span class="report-item__field">branding.culori</span>
+        </div>
+        <dl style="margin: 0;">
+          <div class="report-item__row">
+            <dt>Așteptat</dt>
+            <dd>alb, roșu</dd>
+          </div>
+        </dl>
+        <p class="report-item__reason">În poza 3 (detaliu) se distinge alb cu siguranță, dar al doilea ton apare maroniu-închis din cauza expunerii; nu pot confirma „roșu” fără riscul de eroare.</p>
+      </article>
+    </section>
+
+    <div class="row-actions" style="margin-top: var(--s-6);">
+      <a href="validate.html" class="btn btn--ghost">
+        <span aria-hidden="true">←</span>
+        Re-rulează validarea
+      </a>
+      <a href="index.html" class="btn btn--secondary">
+        Începe sesiune nouă
+      </a>
+    </div>
+  </main>
+</body>
+</html>

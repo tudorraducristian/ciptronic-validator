@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Sesiune Discovery</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">Sesiune <code>9c4f...</code> · Tricou</span>
+    </div>
+  </header>
+
+  <main class="page page--wide">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 2/4</strong> — Discovery. Ruta: <code>GET /sessions/{id}</code>.
+      Mai jos: două stări vizualizate consecutiv — în-progres (runda 2/5) și completă (done=true). În aplicația reală, partial-ul <code>#session-body</code> e înlocuit prin HTMX swap la <code>POST /sessions/{id}/answer</code>.
+    </div>
+
+    <h1>Specificare tricou</h1>
+    <p class="muted" style="margin-bottom: var(--s-6);">
+      Descriere inițială: <em>„O bluză cu logo pe piept stâng, culoare navy, mâneci scurte.”</em>
+    </p>
+
+    <!-- ============== STATE A: In progress, Runda 2/5 ============== -->
+    <div class="divider-label">Stare A — Runda 2/5 în curs</div>
+
+    <section id="session-body" class="discovery">
+
+      <!-- LEFT: checklist read-only -->
+      <aside class="card">
+        <h2 class="card__title">Stare specificație</h2>
+        <ul class="checklist">
+          <li>
+            <span class="checklist__icon checklist__icon--done" aria-label="completat">✓</span>
+            <div>
+              <span class="checklist__key">culoare_principala</span>
+              <span class="checklist__value">albastru navy</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--pending" aria-label="lipsește">·</span>
+            <div>
+              <span class="checklist__key">material</span>
+              <span class="checklist__value checklist__value--empty">nu s-a răspuns încă</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--pending" aria-label="lipsește">·</span>
+            <div>
+              <span class="checklist__key">croială</span>
+              <span class="checklist__value checklist__value--empty">nu s-a răspuns încă</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--pending" aria-label="lipsește">·</span>
+            <div>
+              <span class="checklist__key">guler</span>
+              <span class="checklist__value checklist__value--empty">nu s-a răspuns încă</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--done" aria-label="completat">✓</span>
+            <div>
+              <span class="checklist__key">mâneci</span>
+              <span class="checklist__value">scurte</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--pending" aria-label="parțial">·</span>
+            <div>
+              <span class="checklist__key">branding</span>
+              <span class="checklist__value muted" style="font-size: 13px;">parțial</span>
+              <ul class="checklist__nested">
+                <li>
+                  <span class="checklist__icon checklist__icon--done" aria-label="completat">✓</span>
+                  <div>
+                    <span class="checklist__key">poziție</span>
+                    <span class="checklist__value">piept stâng</span>
+                  </div>
+                </li>
+                <li>
+                  <span class="checklist__icon checklist__icon--pending" aria-label="lipsește">·</span>
+                  <div>
+                    <span class="checklist__key">tehnică</span>
+                    <span class="checklist__value checklist__value--empty">nu s-a răspuns încă</span>
+                  </div>
+                </li>
+                <li>
+                  <span class="checklist__icon checklist__icon--pending" aria-label="lipsește">·</span>
+                  <div>
+                    <span class="checklist__key">culori</span>
+                    <span class="checklist__value checklist__value--empty">—</span>
+                  </div>
+                </li>
+                <li>
+                  <span class="checklist__icon checklist__icon--pending" aria-label="lipsește">·</span>
+                  <div>
+                    <span class="checklist__key">dimensiuni aproximative</span>
+                    <span class="checklist__value checklist__value--empty">—</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+      </aside>
+
+      <!-- RIGHT: questions form -->
+      <section class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-4); gap: var(--s-3); flex-wrap: wrap;">
+          <h2 style="margin: 0; font-family: var(--ff-sans); font-size: 18px;">Întrebări pentru tine</h2>
+          <span class="round-pill">
+            <span class="round-pill__dot" aria-hidden="true"></span>
+            Runda 2 din 5
+          </span>
+        </div>
+
+        <form
+          action="/sessions/9c4f.../answer"
+          method="post"
+          hx-post="/sessions/9c4f.../answer"
+          hx-target="#session-body"
+          hx-swap="outerHTML"
+        >
+          <!-- Q1: material — input text (no variants) -->
+          <div class="question">
+            <div class="question__id">câmp: material</div>
+            <label class="question__text" for="answer-material">Ce material preferi pentru tricou?</label>
+            <input class="input" id="answer-material" name="answer.material"
+                   placeholder="ex: bumbac 100%, bumbac+poliester" />
+            <span class="field__hint">Acceptă text liber; LLM-ul normalizează ulterior.</span>
+          </div>
+
+          <!-- Q2: croială — radio variants -->
+          <div class="question">
+            <div class="question__id">câmp: croială</div>
+            <label class="question__text">Ce croială vrei?</label>
+            <div class="radio-group" role="radiogroup" aria-label="Croială">
+              <label class="radio">
+                <input type="radio" name="answer.croiala" value="regular" />
+                regular
+              </label>
+              <label class="radio radio--checked">
+                <input type="radio" name="answer.croiala" value="slim" checked />
+                slim
+              </label>
+              <label class="radio">
+                <input type="radio" name="answer.croiala" value="oversize" />
+                oversize
+              </label>
+            </div>
+          </div>
+
+          <!-- Q3: guler — radio variants -->
+          <div class="question">
+            <div class="question__id">câmp: guler</div>
+            <label class="question__text">Tip guler?</label>
+            <div class="radio-group" role="radiogroup" aria-label="Guler">
+              <label class="radio">
+                <input type="radio" name="answer.guler" value="rotund" />
+                rotund
+              </label>
+              <label class="radio">
+                <input type="radio" name="answer.guler" value="V" />
+                în V
+              </label>
+              <label class="radio">
+                <input type="radio" name="answer.guler" value="polo" />
+                polo
+              </label>
+            </div>
+          </div>
+
+          <!-- Q4: branding.tehnica — radio variants -->
+          <div class="question">
+            <div class="question__id">câmp: branding.tehnica</div>
+            <label class="question__text">Ce tehnică de aplicare a logo-ului?</label>
+            <div class="radio-group" role="radiogroup" aria-label="Tehnică branding">
+              <label class="radio">
+                <input type="radio" name="answer.branding.tehnica" value="serigrafie" />
+                serigrafie
+              </label>
+              <label class="radio">
+                <input type="radio" name="answer.branding.tehnica" value="broderie" />
+                broderie
+              </label>
+              <label class="radio">
+                <input type="radio" name="answer.branding.tehnica" value="DTF" />
+                DTF
+              </label>
+              <label class="radio">
+                <input type="radio" name="answer.branding.tehnica" value="sublimare" />
+                sublimare
+              </label>
+            </div>
+          </div>
+
+          <div class="row-actions">
+            <span class="muted" style="font-size: 13px;">Răspunde la cele 4 întrebări și trimite.</span>
+            <button type="submit" class="btn btn--primary">
+              Trimite răspunsurile
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <!-- ============== STATE B: Complete, done=true ============== -->
+    <div class="divider-label">Stare B — done=true (după o rundă reușită)</div>
+
+    <section class="discovery">
+
+      <!-- LEFT: full checklist -->
+      <aside class="card">
+        <h2 class="card__title">Stare specificație</h2>
+        <ul class="checklist">
+          <li>
+            <span class="checklist__icon checklist__icon--done">✓</span>
+            <div>
+              <span class="checklist__key">culoare_principala</span>
+              <span class="checklist__value">albastru navy</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--done">✓</span>
+            <div>
+              <span class="checklist__key">material</span>
+              <span class="checklist__value">bumbac 100%</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--done">✓</span>
+            <div>
+              <span class="checklist__key">croială</span>
+              <span class="checklist__value">slim</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--done">✓</span>
+            <div>
+              <span class="checklist__key">guler</span>
+              <span class="checklist__value">rotund</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--done">✓</span>
+            <div>
+              <span class="checklist__key">mâneci</span>
+              <span class="checklist__value">scurte</span>
+            </div>
+          </li>
+          <li>
+            <span class="checklist__icon checklist__icon--done">✓</span>
+            <div>
+              <span class="checklist__key">branding</span>
+              <ul class="checklist__nested">
+                <li>
+                  <span class="checklist__icon checklist__icon--done">✓</span>
+                  <div>
+                    <span class="checklist__key">poziție</span>
+                    <span class="checklist__value">piept stâng</span>
+                  </div>
+                </li>
+                <li>
+                  <span class="checklist__icon checklist__icon--done">✓</span>
+                  <div>
+                    <span class="checklist__key">tehnică</span>
+                    <span class="checklist__value">serigrafie</span>
+                  </div>
+                </li>
+                <li>
+                  <span class="checklist__icon checklist__icon--done">✓</span>
+                  <div>
+                    <span class="checklist__key">culori</span>
+                    <span class="checklist__value">alb, roșu</span>
+                  </div>
+                </li>
+                <li>
+                  <span class="checklist__icon checklist__icon--done">✓</span>
+                  <div>
+                    <span class="checklist__key">dimensiuni aproximative</span>
+                    <span class="checklist__value">10 cm × 10 cm</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+      </aside>
+
+      <!-- RIGHT: done state, CTA -->
+      <section class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-4); flex-wrap: wrap; gap: var(--s-3);">
+          <h2 style="margin: 0; font-family: var(--ff-sans); font-size: 18px;">Specificare completă</h2>
+          <span class="badge badge--success">✓ done</span>
+        </div>
+
+        <div class="callout">
+          <strong>Toate câmpurile sunt completate</strong> după 3 runde de întrebări. Asistentul nu mai are nevoie de clarificări.
+        </div>
+
+        <p style="margin-bottom: var(--s-5);">
+          Poți continua cu validarea vizuală — încarci 1–4 poze ale produsului finit
+          și primești un raport pe trei zone (conform / neconform / nevizibil).
+        </p>
+
+        <div class="row-actions" style="justify-content: flex-end;">
+          <a class="btn btn--ghost" href="#" aria-disabled="true" tabindex="-1" style="pointer-events: none; opacity: 0.6;">
+            Editează (indisponibil în MVP)
+          </a>
+          <a class="btn btn--primary btn--lg" href="validate.html">
+            Validează cu poze
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
+      </section>
+    </section>
+
+  </main>
+</body>
+</html>

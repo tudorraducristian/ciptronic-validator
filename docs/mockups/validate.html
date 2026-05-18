@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Încarcă poze</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">Sesiune <code>9c4f...</code> · Tricou</span>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 3/4</strong> — Validare. Rute: <code>GET /sessions/{id}/validate</code> (form) și <code>POST /sessions/{id}/validate</code> (multipart).
+      Mai jos: două stări — slot-uri goale și slot-uri completate cu preview.
+    </div>
+
+    <h1>Încarcă pozele produsului</h1>
+    <p>
+      Pentru a putea verifica vizual fiecare câmp din specificație, încarcă minim o poză.
+      Recomandăm 2–4 poze din unghiuri diferite (față, spate, detaliu logo).
+    </p>
+
+    <div class="callout" style="margin-bottom: var(--s-5);">
+      <strong>Restricții:</strong> JPG / PNG / WEBP · max <strong>5 MB</strong> per poză · max <strong>20 MB</strong> total. Pozele se salvează local în <code>uploads/{session_id}/</code>.
+    </div>
+
+    <form
+      class="card"
+      action="/sessions/9c4f.../validate"
+      method="post"
+      enctype="multipart/form-data"
+    >
+      <h2 class="card__title">Slot-uri de încărcare</h2>
+
+      <div class="upload-grid">
+        <!-- Slot 1: required, FILLED (preview) -->
+        <div class="upload-slot upload-slot--filled">
+          <div class="upload-slot__label">
+            <span>Poza 1 — față</span>
+            <span class="badge badge--required">obligatoriu</span>
+          </div>
+          <div class="upload-slot__thumb upload-slot__thumb--preview" aria-label="Previzualizare poză 1">
+            <span style="position: relative; z-index: 1; margin-top: 70px;">tricou navy · față</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="upload-slot__filename">img1_fata.jpg · 1.3 MB</span>
+            <button type="button" class="btn btn--ghost" style="padding: 4px 8px; min-height: auto; font-size: 13px;">Înlocuiește</button>
+          </div>
+          <input type="file" name="image1" accept="image/*" hidden />
+        </div>
+
+        <!-- Slot 2: optional, FILLED -->
+        <div class="upload-slot upload-slot--filled">
+          <div class="upload-slot__label">
+            <span>Poza 2 — spate</span>
+            <span class="badge badge--neutral">opțional</span>
+          </div>
+          <div class="upload-slot__thumb upload-slot__thumb--preview" aria-label="Previzualizare poză 2">
+            <span style="position: relative; z-index: 1; margin-top: 70px;">tricou navy · spate</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="upload-slot__filename">img2_spate.jpg · 1.1 MB</span>
+            <button type="button" class="btn btn--ghost" style="padding: 4px 8px; min-height: auto; font-size: 13px;">Înlocuiește</button>
+          </div>
+          <input type="file" name="image2" accept="image/*" hidden />
+        </div>
+
+        <!-- Slot 3: optional, FILLED with detail -->
+        <div class="upload-slot upload-slot--filled">
+          <div class="upload-slot__label">
+            <span>Poza 3 — detaliu logo</span>
+            <span class="badge badge--neutral">opțional</span>
+          </div>
+          <div class="upload-slot__thumb upload-slot__thumb--preview" aria-label="Previzualizare poză 3">
+            <span style="position: relative; z-index: 1; margin-top: 70px;">detaliu serigrafie</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="upload-slot__filename">img3_logo.jpg · 0.9 MB</span>
+            <button type="button" class="btn btn--ghost" style="padding: 4px 8px; min-height: auto; font-size: 13px;">Înlocuiește</button>
+          </div>
+          <input type="file" name="image3" accept="image/*" hidden />
+        </div>
+
+        <!-- Slot 4: optional, EMPTY -->
+        <div class="upload-slot">
+          <div class="upload-slot__label">
+            <span>Poza 4</span>
+            <span class="badge badge--neutral">opțional</span>
+          </div>
+          <div class="upload-slot__thumb">
+            <span>Trage o poză aici sau apasă pentru a alege</span>
+          </div>
+          <input type="file" name="image4" accept="image/*" />
+        </div>
+      </div>
+
+      <div class="row-actions">
+        <a href="session.html" class="btn btn--ghost">
+          <span aria-hidden="true">←</span>
+          Înapoi la specificare
+        </a>
+        <button type="submit" class="btn btn--primary btn--lg">
+          Rulează validarea
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </form>
+
+    <p class="muted" style="font-size: 13px; margin-top: var(--s-5); text-align: center;">
+      Validarea folosește Claude Sonnet 4.6 cu vision. Durează tipic 5–15 secunde.
+    </p>
+  </main>
+</body>
+</html>
