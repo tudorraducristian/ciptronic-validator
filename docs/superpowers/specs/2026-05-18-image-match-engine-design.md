@@ -29,27 +29,39 @@ Acest motor este **independent** de Discovery / Inspector agent-ul descris în `
 
 ### Structura de fișiere (noi, nu modifică nimic existent)
 
+Totul stă într-un pachet Python izolat `image_matcher/` la rădăcina proiectului, ca să nu se confunde cu codul Ciptronic Validator viitor (`agents/`, `web/`, `db/`, `schemas/`) și ca să poată fi mutat sau redenumit ulterior fără să modifice cod intern.
+
 ```
 ciptronic_validator/
-├── match_engine.py       # motor: funcții pure + un singur apel I/O (call_llm)
-├── run_match.py          # CLI subțire: scanează folder, iterează perechi, printează
-├── input/                # user-managed; conține perechile *_sim.* + *_real.*
-├── output/               # generat; gitignored
-│   └── <base>/
-│       ├── sim.json
-│       └── compare.json
-└── tests/
-    ├── test_match_engine.py
-    └── fixtures/
-        ├── valid_sim_response.json
-        ├── invalid_sim_missing_id.json
-        ├── valid_compare_response.json
-        └── invalid_compare_count.json
+├── requirements.txt          # la root, shared cu .venv și cu proiectul viitor
+├── .gitignore                # la root
+└── image_matcher/            # tot pachetul, izolat
+    ├── __init__.py
+    ├── engine.py             # motor: funcții pure + un singur apel I/O (call_llm)
+    ├── run.py                # CLI subțire (rulat ca `python -m image_matcher.run`)
+    ├── README.md             # readme specific tool-ului
+    ├── .env.example          # ANTHROPIC_API_KEY=...
+    ├── input/                # user-managed; conține perechile *_sim.* + *_real.*
+    ├── output/               # generat; gitignored
+    │   └── <base>/
+    │       ├── sim.json
+    │       └── compare.json
+    └── tests/
+        ├── test_engine.py
+        └── fixtures/
+            ├── valid_sim_response.json
+            ├── invalid_sim_missing_id.json
+            ├── valid_compare_response.json
+            └── invalid_compare_count.json
 ```
+
+**Import-uri interne relative.** În `run.py`: `from .engine import ...`. Asta înseamnă că redenumirea folderului (ex: `image_matcher/` → `agents/`) nu cere atingere de cod intern; doar consumatorii externi (UI viitor) actualizează `from image_matcher.engine import ...` → `from agents.matcher import ...`.
+
+**Rulare:** `python -m image_matcher.run` din rădăcina proiectului. Asta tratează folderul ca pachet și permite import-urile relative. NU se rulează cu `python image_matcher/run.py` direct (sparge import-urile relative).
 
 ### Frontiere între module
 
-Toată logica trăiește în `match_engine.py`. O singură funcție este impură (`call_llm`). Restul sunt funcții pure care pot fi testate fără să atingem API-ul Anthropic.
+Toată logica trăiește în `image_matcher/engine.py`. O singură funcție este impură (`call_llm`). Restul sunt funcții pure care pot fi testate fără să atingem API-ul Anthropic.
 
 | Funcție | Pură? | Rol |
 |---|---|---|
@@ -65,7 +77,7 @@ Toată logica trăiește în `match_engine.py`. O singură funcție este impură
 | `compare_real(sim_report, real_path)` | Nu | idem pt apelul 2 |
 | `process_pair(base, sim, real, out_dir)` | Nu | pipeline complet pe o pereche |
 
-`run_match.py` rămâne sub 50 linii: parsare argumente, apel `find_pairs`, loop peste perechi cu `process_pair`, print.
+`image_matcher/run.py` rămâne sub 50 linii: parsare argumente, apel `find_pairs`, loop peste perechi cu `process_pair`, print.
 
 ## Modelul de date
 
@@ -214,7 +226,7 @@ Listă liberă de criterii vizuale identificate în mockup, plus un bloc `overal
 
 Valori lungi trunchiate cu `…` la limita coloanei (default 80 chars total). `null` → `—`.
 
-## Prompts (inline în `match_engine.py`)
+## Prompts (inline în `image_matcher/engine.py`)
 
 ### `SIM_PROMPT`
 
@@ -296,7 +308,7 @@ Schema completă de output e descrisă în prompt (vezi `parse_compare_response`
 - Toate `parse_*` ridică `ValueError` cu mesaj concret citând câmpul lipsă/invalid.
 - `call_llm` are **un singur retry** pe rate-limit / 5xx. Pe orice altă eroare, re-raise cu context (`f"sim analysis failed for {path}: {e}"`).
 - Dacă `parse_compare_response` eșuează, `compare_real` retry-uiește **o singură dată** cu un hint adăugat la mesaj (`"Your previous response had: {error}. Please correct and return valid JSON."`). A doua eșuare → raise.
-- În `run_match.py`, o pereche care eșuează e logată și skipped; batch-ul continuă pe restul.
+- În `image_matcher/run.py`, o pereche care eșuează e logată și skipped; batch-ul continuă pe restul.
 
 ## Strategia de testare
 
@@ -321,11 +333,11 @@ Fixtures sunt mici (3-4 criterii fiecare), nu snapshot-uri gigantice.
 
 ```
 După setarea ANTHROPIC_API_KEY:
-- [ ] pytest tests/ → toate trec, sub 2s
-- [ ] input/tshirt_01_sim.png + input/tshirt_01_real.jpg
-- [ ] python run_match.py → tabel ASCII cu coloane aliniate
-- [ ] output/tshirt_01/sim.json: >= 4 criterii cu `details` non-vide
-- [ ] output/tshirt_01/compare.json: summary.total == len(rows)
+- [ ] python -m pytest image_matcher/tests/ -v → toate trec, sub 2s
+- [ ] image_matcher/input/tshirt_01_sim.png + image_matcher/input/tshirt_01_real.jpg
+- [ ] python -m image_matcher.run → tabel ASCII cu coloane aliniate
+- [ ] image_matcher/output/tshirt_01/sim.json: >= 4 criterii cu `details` non-vide
+- [ ] image_matcher/output/tshirt_01/compare.json: summary.total == len(rows)
 - [ ] Detaliu absent în real → missing_in_real + confidence: low
 - [ ] Detaliu extra pe real → extra_on_real
 - [ ] A doua pereche → batch [1/2], [2/2]
@@ -335,10 +347,10 @@ După setarea ANTHROPIC_API_KEY:
 ## CLI
 
 ```bash
-python run_match.py [--folder input/] [--output output/] [--model claude-sonnet-4-6]
+python -m image_matcher.run [--folder PATH] [--output PATH] [--model claude-sonnet-4-6]
 ```
 
-Default: `--folder input/`, `--output output/`. Toate sunt opționale.
+Default: `--folder image_matcher/input/`, `--output image_matcher/output/` (rezolvate relativ la locația lui `run.py`, deci comanda merge din orice cwd). Toate sunt opționale.
 
 ## Out of scope pentru MVP
 

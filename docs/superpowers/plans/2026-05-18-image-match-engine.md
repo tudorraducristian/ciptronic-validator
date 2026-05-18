@@ -4,9 +4,9 @@
 
 **Goal:** Build a standalone CLI engine that compares mockup-vs-real product image pairs using Claude Sonnet 4.6 vision, producing a per-criterion match table per pair.
 
-**Architecture:** Two Python files at project root. `match_engine.py` holds pure functions (find_pairs, encode_image, build/parse messages, render_table) plus a single I/O function (`call_llm`) plus thin orchestrators (analyze_sim, compare_real, process_pair). `run_match.py` is a thin CLI. Pure functions are unit-tested with pytest; the LLM path is verified manually. Independent from the existing Ciptronic Validator plan.
+**Architecture:** Self-contained Python package at `image_matcher/` (sibling of future Ciptronic Validator code). `engine.py` holds pure functions (find_pairs, encode_image, build/parse messages, render_table) plus a single I/O function (`call_llm`) plus thin orchestrators (analyze_sim, compare_real, process_pair). `run.py` is a thin CLI with `from .engine import …` (relative imports), invoked as `python -m image_matcher.run`. Pure functions are unit-tested with pytest; the LLM path is verified manually.
 
-**Tech Stack:** Python 3.10+, anthropic SDK (claude-sonnet-4-6), pytest. No new dependencies.
+**Tech Stack:** Python 3.10+, anthropic SDK (claude-sonnet-4-6), pytest. No new dependencies. `requirements.txt` lives at project root (shared with future Ciptronic Validator code), `.venv/` is shared.
 
 **Spec:** [`docs/superpowers/specs/2026-05-18-image-match-engine-design.md`](../specs/2026-05-18-image-match-engine-design.md)
 
@@ -14,114 +14,151 @@
 
 **Python interpreter for commands:** `.venv\Scripts\python.exe` (already created; `anthropic==0.102.0` and `pytest==9.0.3` already installed).
 
+**Invocation convention:** All commands run from project root. The CLI uses `python -m image_matcher.run` (NOT `python image_matcher/run.py` — the `-m` form is required for relative imports inside the package).
+
 ---
 
 ## Task 1: Scaffolding
 
-Create scaffolding files that other tasks build into. No application code yet.
+Create scaffolding files for the package + the root-level shared files. No application code yet.
 
 **Files:**
-- Create: `requirements.txt`
-- Create: `.gitignore`
-- Create: `.env.example`
-- Create: `match_engine.py` (module docstring only)
-- Create: `run_match.py` (module docstring only)
-- Create: `tests/__init__.py` (empty)
-- Create: `tests/fixtures/.gitkeep` (empty)
-- Create: `input/.gitkeep` (empty)
-- Create: `README.md`
+- Create: `requirements.txt` (root)
+- Create: `.gitignore` (root)
+- Create: `image_matcher/__init__.py`
+- Create: `image_matcher/engine.py` (module docstring only)
+- Create: `image_matcher/run.py` (module docstring only)
+- Create: `image_matcher/.env.example`
+- Create: `image_matcher/README.md`
+- Create: `image_matcher/input/.gitkeep` (empty)
+- Create: `image_matcher/tests/test_engine.py` (empty, will be filled in next tasks)
+- Create: `image_matcher/tests/fixtures/.gitkeep` (empty)
 
-- [ ] **Step 1: Create `requirements.txt`**
+Note: no `image_matcher/tests/__init__.py`. Pytest discovers tests by path; making `tests/` a sub-package causes `from image_matcher.engine import …` to resolve confusingly.
+
+- [ ] **Step 1: Create `requirements.txt` at project root**
 
 ```
 anthropic>=0.102.0
 pytest>=9.0.0
 ```
 
-- [ ] **Step 2: Create `.gitignore`**
+- [ ] **Step 2: Create `.gitignore` at project root**
 
 ```
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
-.env
-input/*
-!input/.gitkeep
-output/
+
+# image_matcher local artifacts
+image_matcher/.env
+image_matcher/input/*
+!image_matcher/input/.gitkeep
+image_matcher/output/
 ```
 
-- [ ] **Step 3: Create `.env.example`**
+- [ ] **Step 3: Create `image_matcher/__init__.py`**
+
+```python
+"""Image match engine package.
+
+Compares 2D product mockups against real product photos via Claude vision.
+Public API: see `image_matcher.engine` for orchestrators
+(`analyze_sim`, `compare_real`, `process_pair`).
+"""
+```
+
+- [ ] **Step 4: Create `image_matcher/engine.py` with placeholder content**
+
+```python
+"""Image match engine: pure functions + a single I/O wrapper.
+
+Pure functions (find_pairs, encode_image, build_*_messages, parse_*_response,
+render_table) are unit-tested in `tests/test_engine.py`. The single I/O
+function (`call_llm`) and the orchestrators (analyze_sim, compare_real,
+process_pair) are verified manually with the checklist in README.md.
+"""
+```
+
+- [ ] **Step 5: Create `image_matcher/run.py` with placeholder content**
+
+```python
+"""Thin CLI wrapper around `image_matcher.engine`.
+
+Invoke from project root with: `python -m image_matcher.run`.
+See `image_matcher/README.md` for usage.
+"""
+```
+
+- [ ] **Step 6: Create `image_matcher/.env.example`**
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-- [ ] **Step 4: Create `match_engine.py` with placeholder content**
-
-```python
-"""Image match engine: compare a 2D mockup vs a real product photo via Claude vision.
-
-Pure functions (find_pairs, encode_image, build_*_messages, parse_*_response,
-render_table) are unit-tested. The single I/O function (`call_llm`) and the
-orchestrators that compose them (analyze_sim, compare_real, process_pair) are
-verified manually with the checklist in README.md.
-"""
-```
-
-- [ ] **Step 5: Create `run_match.py` with placeholder content**
-
-```python
-"""Thin CLI wrapper around match_engine. See README for usage."""
-```
-
-- [ ] **Step 6: Create `tests/__init__.py` (empty file)**
-
-- [ ] **Step 7: Create `tests/fixtures/.gitkeep` (empty file)**
-
-- [ ] **Step 8: Create `input/.gitkeep` (empty file)**
-
-- [ ] **Step 9: Create `README.md`**
+- [ ] **Step 7: Create `image_matcher/README.md`**
 
 ```markdown
-# Image Match Engine
+# image_matcher
 
 Standalone CLI for comparing 2D product mockups against real product photos
-using Claude Sonnet 4.6 vision.
+using Claude Sonnet 4.6 vision. Lives as a self-contained Python package at
+the project root.
 
 ## Setup
 
+From the project root:
+
 1. Activate venv: `.venv\Scripts\Activate.ps1`
-2. Set API key: copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY`,
-   then `$env:ANTHROPIC_API_KEY = (Get-Content .env | Select-String 'ANTHROPIC_API_KEY' | ForEach-Object { $_ -replace 'ANTHROPIC_API_KEY=', '' })`
-3. Place pairs in `input/` named `<base>_sim.<ext>` and `<base>_real.<ext>`.
+2. Copy env template: `Copy-Item image_matcher\.env.example image_matcher\.env`
+3. Edit `image_matcher\.env` and put your real key after `ANTHROPIC_API_KEY=`.
+4. Export it into the session:
+   `$env:ANTHROPIC_API_KEY = ((Get-Content image_matcher\.env) -match '^ANTHROPIC_API_KEY=' -replace 'ANTHROPIC_API_KEY=','')`
+5. Place pairs in `image_matcher/input/` named `<base>_sim.<ext>` and `<base>_real.<ext>`.
 
 ## Run
 
+From project root:
+
 ```
-python run_match.py
+python -m image_matcher.run
 ```
 
-Outputs go to `output/<base>/sim.json` and `output/<base>/compare.json`, with
-the ASCII table printed to terminal.
+Outputs go to `image_matcher/output/<base>/sim.json` and
+`image_matcher/output/<base>/compare.json`. ASCII table prints to terminal.
 
 ## Tests
 
+From project root:
+
 ```
-python -m pytest tests/ -v
+python -m pytest image_matcher/tests/ -v
 ```
 ```
 
-- [ ] **Step 10: Verify nothing breaks**
+- [ ] **Step 8: Create empty files**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/ -v`
-Expected: `no tests ran` (0 tests collected) — file scaffolding is in place.
+Create these files with empty content:
+- `image_matcher/input/.gitkeep`
+- `image_matcher/tests/test_engine.py`
+- `image_matcher/tests/fixtures/.gitkeep`
+
+- [ ] **Step 9: Verify imports work**
+
+Run: `.venv\Scripts\python.exe -c "import image_matcher; import image_matcher.engine; import image_matcher.run; print('ok')"`
+Expected: `ok` (the placeholders are importable).
+
+- [ ] **Step 10: Verify pytest discovers nothing**
+
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/ -v`
+Expected: `no tests ran` (file is empty).
 
 - [ ] **Step 11: Commit**
 
 ```bash
-git add requirements.txt .gitignore .env.example match_engine.py run_match.py tests/__init__.py tests/fixtures/.gitkeep input/.gitkeep README.md
-git commit -m "feat(match-engine): add scaffolding files"
+git add requirements.txt .gitignore image_matcher/
+git commit -m "feat(image_matcher): add package scaffolding"
 ```
 
 ---
@@ -131,21 +168,21 @@ git commit -m "feat(match-engine): add scaffolding files"
 Implement folder scanning that returns sorted `(base, sim_path, real_path)` tuples.
 
 **Files:**
-- Modify: `match_engine.py`
-- Create: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `tests/test_match_engine.py` with:
+Write `image_matcher/tests/test_engine.py` (replaces empty content):
 
 ```python
-"""Unit tests for match_engine pure functions."""
+"""Unit tests for image_matcher.engine pure functions."""
 import logging
 from pathlib import Path
 
 import pytest
 
-from match_engine import find_pairs
+from image_matcher.engine import find_pairs
 
 
 def _touch(path: Path) -> None:
@@ -211,12 +248,12 @@ def test_find_pairs_ignores_unrelated_files(tmp_path):
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
-Expected: ImportError or "cannot import name 'find_pairs' from match_engine".
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
+Expected: ImportError or "cannot import name 'find_pairs' from image_matcher.engine".
 
-- [ ] **Step 3: Implement `find_pairs` in `match_engine.py`**
+- [ ] **Step 3: Implement `find_pairs` in `image_matcher/engine.py`**
 
-Add after the existing module docstring:
+Add after the module docstring:
 
 ```python
 import logging
@@ -261,14 +298,14 @@ def find_pairs(folder: Path) -> list[tuple[str, Path, Path]]:
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: 5 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add find_pairs with orphan warning"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add find_pairs with orphan warning"
 ```
 
 ---
@@ -278,15 +315,15 @@ git commit -m "feat(match-engine): add find_pairs with orphan warning"
 Read a file from disk, base64-encode it, and return `(media_type, b64_data)`. Enforce Anthropic's ~5MB limit.
 
 **Files:**
-- Modify: `match_engine.py`
-- Modify: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Append failing tests**
 
-Append to `tests/test_match_engine.py`:
+Append to `image_matcher/tests/test_engine.py`:
 
 ```python
-from match_engine import encode_image
+from image_matcher.engine import encode_image
 
 
 def test_encode_image_png(tmp_path):
@@ -350,12 +387,12 @@ def test_encode_image_missing(tmp_path):
 
 - [ ] **Step 2: Run tests to verify the new ones fail**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: ImportError on `encode_image`.
 
 - [ ] **Step 3: Implement `encode_image`**
 
-Add to `match_engine.py` (below `find_pairs`):
+Add to `image_matcher/engine.py` (below `find_pairs`):
 
 ```python
 import base64
@@ -391,14 +428,14 @@ Add `import base64` near the top (keep imports grouped).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: all tests pass (12 total now).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add encode_image with size + extension checks"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add encode_image with size + extension checks"
 ```
 
 ---
@@ -408,13 +445,13 @@ git commit -m "feat(match-engine): add encode_image with size + extension checks
 Add the system prompt for the sim analysis call and a function that composes the Anthropic messages payload.
 
 **Files:**
-- Modify: `match_engine.py`
-- Modify: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Append failing tests**
 
 ```python
-from match_engine import SIM_PROMPT, build_sim_messages
+from image_matcher.engine import SIM_PROMPT, build_sim_messages
 
 
 def test_sim_prompt_exists():
@@ -446,10 +483,10 @@ def test_build_sim_messages_structure():
 
 - [ ] **Step 2: Run tests to verify failure**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: ImportError on `SIM_PROMPT` / `build_sim_messages`.
 
-- [ ] **Step 3: Add `SIM_PROMPT` and `build_sim_messages` to `match_engine.py`**
+- [ ] **Step 3: Add `SIM_PROMPT` and `build_sim_messages` to `image_matcher/engine.py`**
 
 ```python
 SIM_PROMPT = """You are a meticulous visual inspector analyzing a 2D product mockup image.
@@ -527,14 +564,14 @@ def build_sim_messages(
 
 - [ ] **Step 4: Run tests to verify pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add SIM_PROMPT and build_sim_messages"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add SIM_PROMPT and build_sim_messages"
 ```
 
 ---
@@ -544,14 +581,14 @@ git commit -m "feat(match-engine): add SIM_PROMPT and build_sim_messages"
 Parse and validate the JSON returned by the sim-analysis LLM call.
 
 **Files:**
-- Modify: `match_engine.py`
-- Modify: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Append failing tests**
 
 ```python
 import json
-from match_engine import parse_sim_response
+from image_matcher.engine import parse_sim_response
 
 
 def _valid_sim_dict():
@@ -640,12 +677,12 @@ def test_parse_sim_response_missing_criterion_field():
 
 - [ ] **Step 2: Run tests to verify failure**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: ImportError on `parse_sim_response`.
 
 - [ ] **Step 3: Implement `parse_sim_response`**
 
-Add to `match_engine.py`:
+Add to `image_matcher/engine.py`:
 
 ```python
 import json
@@ -710,14 +747,14 @@ Add `import json` and `import re` near the existing imports.
 
 - [ ] **Step 4: Run tests to verify pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add parse_sim_response with validation"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add parse_sim_response with validation"
 ```
 
 ---
@@ -727,13 +764,13 @@ git commit -m "feat(match-engine): add parse_sim_response with validation"
 Add the comparison prompt and a function that composes the messages payload for the second LLM call.
 
 **Files:**
-- Modify: `match_engine.py`
-- Modify: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Append failing tests**
 
 ```python
-from match_engine import COMPARE_PROMPT, build_compare_messages
+from image_matcher.engine import COMPARE_PROMPT, build_compare_messages
 
 
 def test_compare_prompt_exists():
@@ -769,7 +806,7 @@ def test_build_compare_messages_structure():
 
 - [ ] **Step 2: Run tests to verify failure**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: ImportError.
 
 - [ ] **Step 3: Add `COMPARE_PROMPT` and `build_compare_messages`**
@@ -874,14 +911,14 @@ def build_compare_messages(
 
 - [ ] **Step 4: Run tests to verify pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add COMPARE_PROMPT and build_compare_messages"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add COMPARE_PROMPT and build_compare_messages"
 ```
 
 ---
@@ -891,13 +928,13 @@ git commit -m "feat(match-engine): add COMPARE_PROMPT and build_compare_messages
 Parse + strictly validate the comparison JSON.
 
 **Files:**
-- Modify: `match_engine.py`
-- Modify: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Append failing tests**
 
 ```python
-from match_engine import parse_compare_response
+from image_matcher.engine import parse_compare_response
 
 
 def _valid_compare_dict():
@@ -1035,12 +1072,12 @@ def test_parse_compare_response_extra_on_real_with_non_null_sim():
 
 - [ ] **Step 2: Run tests to verify failure**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: ImportError on `parse_compare_response`.
 
 - [ ] **Step 3: Implement `parse_compare_response`**
 
-Add to `match_engine.py`:
+Add to `image_matcher/engine.py`:
 
 ```python
 _MATCH_TYPES = {"exact", "semantic", "partial", "missing_in_real", "extra_on_real"}
@@ -1113,14 +1150,14 @@ def parse_compare_response(text: str) -> dict:
 
 - [ ] **Step 4: Run tests to verify pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add parse_compare_response with strict validation"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add parse_compare_response with strict validation"
 ```
 
 ---
@@ -1130,13 +1167,13 @@ git commit -m "feat(match-engine): add parse_compare_response with strict valida
 ASCII table with 4 columns, truncation on long values, `—` for nulls.
 
 **Files:**
-- Modify: `match_engine.py`
-- Modify: `tests/test_match_engine.py`
+- Modify: `image_matcher/engine.py`
+- Modify: `image_matcher/tests/test_engine.py`
 
 - [ ] **Step 1: Append failing tests**
 
 ```python
-from match_engine import render_table
+from image_matcher.engine import render_table
 
 
 def test_render_table_basic():
@@ -1169,7 +1206,7 @@ def test_render_table_truncates_long_values():
 
 - [ ] **Step 2: Run tests to verify failure**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: ImportError.
 
 - [ ] **Step 3: Implement `render_table`**
@@ -1224,14 +1261,14 @@ def render_table(report: dict, width: int = 80) -> str:
 
 - [ ] **Step 4: Run tests to verify pass**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_match_engine.py -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/test_engine.py -v`
 Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add match_engine.py tests/test_match_engine.py
-git commit -m "feat(match-engine): add render_table with truncation and null handling"
+git add image_matcher/engine.py image_matcher/tests/test_engine.py
+git commit -m "feat(image_matcher): add render_table with truncation and null handling"
 ```
 
 ---
@@ -1241,11 +1278,11 @@ git commit -m "feat(match-engine): add render_table with truncation and null han
 Add the single I/O function and the three orchestrators that compose pure pieces. These are NOT unit-tested — the manual checklist covers them.
 
 **Files:**
-- Modify: `match_engine.py`
+- Modify: `image_matcher/engine.py`
 
 - [ ] **Step 1: Implement `call_llm`**
 
-Add to `match_engine.py`:
+Add to `image_matcher/engine.py`:
 
 ```python
 import os
@@ -1373,29 +1410,33 @@ def process_pair(
 
 - [ ] **Step 5: Run all existing tests as a regression check**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/ -v`
-Expected: all tests still pass (no regression in pure functions).
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/ -v`
+Expected: all pure-function tests still pass.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add match_engine.py
-git commit -m "feat(match-engine): add call_llm and orchestrators (analyze_sim, compare_real, process_pair)"
+git add image_matcher/engine.py
+git commit -m "feat(image_matcher): add call_llm and orchestrators"
 ```
 
 ---
 
-## Task 10: `run_match.py` CLI
+## Task 10: `image_matcher/run.py` CLI
 
-Thin CLI wrapper.
+Thin CLI wrapper using relative imports. Defaults resolve relative to the package location so the command works from any cwd.
 
 **Files:**
-- Modify: `run_match.py`
+- Modify: `image_matcher/run.py`
 
 - [ ] **Step 1: Replace placeholder with the CLI**
 
 ```python
-"""Thin CLI wrapper around match_engine. See README for usage."""
+"""Thin CLI wrapper around `image_matcher.engine`.
+
+Invoke from project root with: `python -m image_matcher.run`.
+See `image_matcher/README.md` for usage.
+"""
 from __future__ import annotations
 
 import argparse
@@ -1403,14 +1444,21 @@ import logging
 import sys
 from pathlib import Path
 
-from match_engine import find_pairs, process_pair, render_table
+from .engine import find_pairs, process_pair, render_table
+
+_PACKAGE_DIR = Path(__file__).resolve().parent
+_DEFAULT_INPUT = _PACKAGE_DIR / "input"
+_DEFAULT_OUTPUT = _PACKAGE_DIR / "output"
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Compare sim vs real product images.")
-    parser.add_argument("--folder", type=Path, default=Path("input"),
+    parser = argparse.ArgumentParser(
+        description="Compare sim vs real product images.",
+        prog="python -m image_matcher.run",
+    )
+    parser.add_argument("--folder", type=Path, default=_DEFAULT_INPUT,
                         help="Folder containing *_sim.* and *_real.* pairs.")
-    parser.add_argument("--output", type=Path, default=Path("output"),
+    parser.add_argument("--output", type=Path, default=_DEFAULT_OUTPUT,
                         help="Folder where per-pair output is written.")
     parser.add_argument("--model", default="claude-sonnet-4-6",
                         help="Anthropic model id.")
@@ -1435,12 +1483,11 @@ def main(argv: list[str] | None = None) -> int:
     failures = 0
     for i, (base, sim, real) in enumerate(pairs, 1):
         print(f"\n[{i}/{len(pairs)}] {base}:")
-        print(f"  → analyzing {sim.name} ... ", end="", flush=True)
+        print(f"  → analyzing {sim.name} ... (via LLM)")
         try:
-            print("(via LLM)")
             report = process_pair(base, sim, real, args.output, model=args.model)
         except Exception as e:  # batch must continue
-            print(f"\n  ✗ failed: {e}", file=sys.stderr)
+            print(f"  ✗ failed: {e}", file=sys.stderr)
             failures += 1
             continue
         print(render_table(report))
@@ -1458,69 +1505,66 @@ if __name__ == "__main__":
 
 - [ ] **Step 2: Smoke-test the CLI (no API call yet)**
 
-Run: `.venv\Scripts\python.exe run_match.py --folder nonexistent`
+Run: `.venv\Scripts\python.exe -m image_matcher.run --folder nonexistent`
 Expected: `input folder not found: nonexistent`, exit code 2.
 
-Run: `.venv\Scripts\python.exe run_match.py --folder input`
-Expected: `no pairs found in input/`, exit code 0 (folder is empty).
+Run: `.venv\Scripts\python.exe -m image_matcher.run`
+Expected: `no pairs found in <…>image_matcher\input/`, exit code 0 (folder is empty).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add run_match.py
-git commit -m "feat(match-engine): add run_match CLI for batch processing"
+git add image_matcher/run.py
+git commit -m "feat(image_matcher): add run.py CLI for batch processing"
 ```
 
 ---
 
-## Task 11: README manual checklist + manual smoke test
+## Task 11: Manual verification checklist
 
-Append the manual verification checklist to the README and run it end-to-end with two real-ish images.
+Append the manual checklist into the package README and run end-to-end with one real pair.
 
 **Files:**
-- Modify: `README.md`
+- Modify: `image_matcher/README.md`
 
 - [ ] **Step 1: Append the manual checklist section**
 
-Append to `README.md`:
+Append to `image_matcher/README.md`:
 
 ```markdown
 
 ## Manual verification checklist
 
-After setting `ANTHROPIC_API_KEY`:
+After setting `ANTHROPIC_API_KEY` in the environment:
 
-- [ ] `python -m pytest tests/ -v` → all pass, sub 2s
-- [ ] Place `input/tshirt_01_sim.png` + `input/tshirt_01_real.jpg`
-- [ ] `python run_match.py` → ASCII table printed with aligned columns
-- [ ] `output/tshirt_01/sim.json` exists, has ≥ 4 criteria with non-empty `details`
-- [ ] `output/tshirt_01/compare.json` exists, `summary.total == len(rows)`
-- [ ] An element absent in real (e.g. back text) → row marked `missing_in_real`,
-      `confidence: low`
-- [ ] An element extra on real (e.g. visible stitch detail) → row marked
-      `extra_on_real`
+- [ ] `python -m pytest image_matcher/tests/ -v` → all pass, sub 2s
+- [ ] Place `image_matcher/input/tshirt_01_sim.png` + `image_matcher/input/tshirt_01_real.jpg`
+- [ ] `python -m image_matcher.run` → ASCII table printed with aligned columns
+- [ ] `image_matcher/output/tshirt_01/sim.json` exists, has ≥ 4 criteria with non-empty `details`
+- [ ] `image_matcher/output/tshirt_01/compare.json` exists, `summary.total == len(rows)`
+- [ ] An element absent in real (e.g. back text) → row marked `missing_in_real`, `confidence: low`
+- [ ] An element extra on real (e.g. visible stitch detail) → row marked `extra_on_real`
 - [ ] Add a second pair `tshirt_02_*` → batch runs both, prints `[1/2]` and `[2/2]`
-- [ ] An orphan pair (one side missing) → warning logged, pair skipped, batch
-      continues
+- [ ] An orphan pair (one side missing) → warning logged, pair skipped, batch continues
 ```
 
 - [ ] **Step 2: Run unit tests one more time**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/ -v`
+Run: `.venv\Scripts\python.exe -m pytest image_matcher/tests/ -v`
 Expected: all unit tests pass.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add README.md
-git commit -m "docs(match-engine): add manual verification checklist"
+git add image_matcher/README.md
+git commit -m "docs(image_matcher): add manual verification checklist"
 ```
 
 - [ ] **Step 4: Manual end-to-end smoke** (requires `ANTHROPIC_API_KEY`)
 
-1. Place a mockup and a photo pair into `input/`, e.g. `input/tshirt_01_sim.png` + `input/tshirt_01_real.jpg`.
+1. Place a mockup and a photo pair into `image_matcher/input/`, e.g. `image_matcher/input/tshirt_01_sim.png` + `image_matcher/input/tshirt_01_real.jpg`.
 2. `$env:ANTHROPIC_API_KEY = "sk-ant-..."` (PowerShell).
-3. `.venv\Scripts\python.exe run_match.py --verbose`
+3. `.venv\Scripts\python.exe -m image_matcher.run --verbose`
 4. Walk through every item of the checklist above. Report any failures.
 
 This step does NOT auto-pass. The implementer reports back to the user; user verifies and approves before declaring MVP complete.
@@ -1530,6 +1574,17 @@ This step does NOT auto-pass. The implementer reports back to the user; user ver
 ## Done criteria
 
 - All 11 tasks completed and committed.
-- `python -m pytest tests/ -v` passes locally.
+- `python -m pytest image_matcher/tests/ -v` passes locally.
 - Manual checklist all green on one real pair.
-- Branch is `feat/mvp-implementation`; no merge to `master` yet — user decides.
+- Branch is whichever you're working on (master or feat/mvp-implementation); no merge to remote until you decide.
+
+---
+
+## Notes on future integration
+
+The package is designed to merge cleanly with the future Ciptronic Validator code:
+
+- `image_matcher` is a self-contained Python package — UI code calls `from image_matcher.engine import process_pair`.
+- `output_dir` is a parameter, so the UI can pass `Path("uploads") / session_id` instead of the CLI default.
+- If you later prefer the engine to live under `agents/` (matching the Ciptronic naming convention), rename the folder with `git mv image_matcher agents` and rename `engine.py` to `matcher.py` if desired. The internal relative imports keep working; only external consumers update their import path.
+- `requirements.txt` at root is shared; future tasks append `fastapi`, `jinja2`, etc.
