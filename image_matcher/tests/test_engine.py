@@ -66,3 +66,65 @@ def test_find_pairs_ignores_unrelated_files(tmp_path):
 
     assert len(pairs) == 1
     assert pairs[0][0] == "a"
+
+
+from image_matcher.engine import encode_image
+
+
+def test_encode_image_png(tmp_path):
+    path = tmp_path / "a.png"
+    path.write_bytes(b"\x89PNG\r\n\x1a\nfakecontent")
+
+    media_type, data = encode_image(path)
+
+    assert media_type == "image/png"
+    assert isinstance(data, str)
+    assert len(data) > 0
+
+
+def test_encode_image_jpeg(tmp_path):
+    path = tmp_path / "a.jpg"
+    path.write_bytes(b"\xff\xd8\xff\xe0fakecontent")
+
+    media_type, _ = encode_image(path)
+
+    assert media_type == "image/jpeg"
+
+
+def test_encode_image_jpeg_alt_extension(tmp_path):
+    path = tmp_path / "a.jpeg"
+    path.write_bytes(b"\xff\xd8\xff\xe0fakecontent")
+
+    media_type, _ = encode_image(path)
+
+    assert media_type == "image/jpeg"
+
+
+def test_encode_image_webp(tmp_path):
+    path = tmp_path / "a.webp"
+    path.write_bytes(b"RIFF\x00\x00\x00\x00WEBPfake")
+
+    media_type, _ = encode_image(path)
+
+    assert media_type == "image/webp"
+
+
+def test_encode_image_unsupported_extension(tmp_path):
+    path = tmp_path / "a.gif"
+    path.write_bytes(b"fake")
+
+    with pytest.raises(ValueError, match="unsupported image extension"):
+        encode_image(path)
+
+
+def test_encode_image_too_large(tmp_path):
+    path = tmp_path / "a.png"
+    path.write_bytes(b"\x00" * (5 * 1024 * 1024 + 1))
+
+    with pytest.raises(ValueError, match="exceeds 5MB"):
+        encode_image(path)
+
+
+def test_encode_image_missing(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        encode_image(tmp_path / "nope.png")

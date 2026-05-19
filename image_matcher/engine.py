@@ -5,6 +5,7 @@ render_table) are unit-tested in `tests/test_engine.py`. The single I/O
 function (`call_llm`) and the orchestrators (analyze_sim, compare_real,
 process_pair) are verified manually with the checklist in README.md.
 """
+import base64
 import logging
 from pathlib import Path
 
@@ -43,3 +44,30 @@ def find_pairs(folder: Path) -> list[tuple[str, Path, Path]]:
             continue
         pairs.append((base, sim, real))
     return pairs
+
+
+_MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+_MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def encode_image(path: Path) -> tuple[str, str]:
+    """Read an image file, return (media_type, base64_data).
+
+    Raises ValueError on unsupported extension or files > 5MB.
+    Raises FileNotFoundError if path does not exist.
+    """
+    ext = path.suffix.lower()
+    media_type = _MEDIA_TYPES.get(ext)
+    if media_type is None:
+        raise ValueError(f"unsupported image extension: {ext!r}")
+    data_bytes = path.read_bytes()
+    if len(data_bytes) > _MAX_IMAGE_BYTES:
+        raise ValueError(
+            f"{path.name} ({len(data_bytes)} bytes) exceeds 5MB limit"
+        )
+    return media_type, base64.b64encode(data_bytes).decode("ascii")
