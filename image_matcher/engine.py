@@ -351,24 +351,33 @@ def parse_compare_response(text: str) -> dict:
                 f"row {i}: match_type=extra_on_real requires sim_value=null"
             )
 
-    summary = data.get("summary")
-    if not isinstance(summary, dict):
-        raise ValueError("missing or invalid 'summary' object")
-    if summary.get("total") != len(rows):
-        raise ValueError(
-            f"summary.total={summary.get('total')} but rows has {len(rows)}"
-        )
+    # Summary is fully derivable from rows; recompute it instead of trusting the
+    # LLM. Sonnet 4.6 reliably gets row-level decisions right but mis-counts
+    # totals/distributions in long lists, so we use rows as the source of truth.
     matched_count = sum(1 for r in rows if r["match"] is True)
-    mismatched_count = len(rows) - matched_count
-    if summary.get("matched") != matched_count:
-        raise ValueError(
-            f"summary.matched={summary.get('matched')} but actual is {matched_count}"
+    by_match_type = {mt: 0 for mt in _MATCH_TYPES}
+    by_confidence = {c: 0 for c in _CONFIDENCES}
+    for r in rows:
+        by_match_type[r["match_type"]] += 1
+        by_confidence[r["confidence"]] += 1
+    llm_summary = data.get("summary")
+    if isinstance(llm_summary, dict) and (
+        llm_summary.get("total") != len(rows)
+        or llm_summary.get("matched") != matched_count
+    ):
+        logger.info(
+            "compare summary diverged from rows (LLM: total=%s matched=%s; "
+            "actual: total=%s matched=%s) — recomputed",
+            llm_summary.get("total"), llm_summary.get("matched"),
+            len(rows), matched_count,
         )
-    if summary.get("mismatched") != mismatched_count:
-        raise ValueError(
-            f"summary.mismatched={summary.get('mismatched')} but actual is "
-            f"{mismatched_count}"
-        )
+    data["summary"] = {
+        "total": len(rows),
+        "matched": matched_count,
+        "mismatched": len(rows) - matched_count,
+        "by_match_type": by_match_type,
+        "by_confidence": by_confidence,
+    }
     return data
 
 
@@ -475,7 +484,7 @@ def compare_real(
     system, messages = build_compare_messages(
         sim_report, b64, media_type, real_path.name
     )
-    raw = call_llm(system, messages, model=model)
+    raw = call_llm(system, messages, model=model, max_tokens=8192)
     try:
         report = parse_compare_response(raw)
     except ValueError as first_error:
@@ -496,7 +505,7 @@ def compare_real(
                 ),
             },
         ]
-        raw = call_llm(system, retry_messages, model=model)
+        raw = call_llm(system, retry_messages, model=model, max_tokens=8192)
         report = parse_compare_response(raw)  # raises if still bad
     report["real_image"] = real_path.name
     return report

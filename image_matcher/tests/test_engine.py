@@ -372,19 +372,54 @@ def test_parse_compare_response_missing_in_real_with_non_null_real():
         parse_compare_response(json.dumps(d))
 
 
-def test_parse_compare_response_summary_total_mismatch():
+def test_parse_compare_response_summary_total_autofixed():
     d = _valid_compare_dict()
-    d["summary"]["total"] = 5
-    with pytest.raises(ValueError, match="summary.total"):
-        parse_compare_response(json.dumps(d))
+    d["summary"]["total"] = 5  # wrong; rows has 2
+    report = parse_compare_response(json.dumps(d))
+    assert report["summary"]["total"] == 2
 
 
-def test_parse_compare_response_summary_matched_mismatched_sum_wrong():
+def test_parse_compare_response_summary_counts_autofixed():
     d = _valid_compare_dict()
-    d["summary"]["matched"] = 2
+    d["summary"]["matched"] = 2  # wrong; only 1 row has match=true
     d["summary"]["mismatched"] = 2
-    with pytest.raises(ValueError, match="matched"):
-        parse_compare_response(json.dumps(d))
+    report = parse_compare_response(json.dumps(d))
+    assert report["summary"]["matched"] == 1
+    assert report["summary"]["mismatched"] == 1
+
+
+def test_parse_compare_response_summary_by_match_type_autofixed():
+    d = _valid_compare_dict()
+    d["summary"]["by_match_type"] = {
+        "exact": 99, "semantic": 0, "partial": 0,
+        "missing_in_real": 0, "extra_on_real": 0,
+    }
+    report = parse_compare_response(json.dumps(d))
+    bmt = report["summary"]["by_match_type"]
+    assert bmt["semantic"] == 1
+    assert bmt["missing_in_real"] == 1
+    assert bmt["exact"] == 0
+
+
+def test_parse_compare_response_summary_by_confidence_autofixed():
+    d = _valid_compare_dict()
+    d["summary"]["by_confidence"] = {"high": 99, "medium": 0, "low": 0}
+    report = parse_compare_response(json.dumps(d))
+    bc = report["summary"]["by_confidence"]
+    assert bc["high"] == 1
+    assert bc["medium"] == 0
+    assert bc["low"] == 1
+
+
+def test_parse_compare_response_missing_summary_built_from_rows():
+    d = _valid_compare_dict()
+    del d["summary"]
+    report = parse_compare_response(json.dumps(d))
+    assert report["summary"]["total"] == 2
+    assert report["summary"]["matched"] == 1
+    assert report["summary"]["mismatched"] == 1
+    assert report["summary"]["by_match_type"]["semantic"] == 1
+    assert report["summary"]["by_confidence"]["high"] == 1
 
 
 def test_parse_compare_response_empty_note():
