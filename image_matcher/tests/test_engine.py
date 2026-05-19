@@ -246,3 +246,37 @@ def test_parse_sim_response_missing_criterion_field():
     del d["criteria"][0]["value"]
     with pytest.raises(ValueError, match="value"):
         parse_sim_response(json.dumps(d))
+
+
+from image_matcher.engine import COMPARE_PROMPT, build_compare_messages
+
+
+def test_compare_prompt_exists():
+    assert isinstance(COMPARE_PROMPT, str)
+    assert "match" in COMPARE_PROMPT
+    assert "missing_in_real" in COMPARE_PROMPT
+
+
+def test_build_compare_messages_structure():
+    sim_report = _valid_sim_dict()
+    system, messages = build_compare_messages(
+        sim_report, "B64", "image/jpeg", "tshirt_01_real.jpg"
+    )
+
+    assert system == COMPARE_PROMPT
+    assert len(messages) == 1
+    content = messages[0]["content"]
+
+    image_blocks = [b for b in content if b["type"] == "image"]
+    text_blocks = [b for b in content if b["type"] == "text"]
+
+    assert len(image_blocks) == 1
+    assert image_blocks[0]["source"]["media_type"] == "image/jpeg"
+    assert image_blocks[0]["source"]["data"] == "B64"
+
+    assert len(text_blocks) == 1
+    text = text_blocks[0]["text"]
+    assert "tshirt_01_real.jpg" in text
+    # The sim_report JSON should be embedded so the LLM sees it.
+    assert "main_color" in text
+    assert "chest_logo" in text

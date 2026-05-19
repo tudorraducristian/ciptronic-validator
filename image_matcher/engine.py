@@ -201,3 +201,100 @@ def parse_sim_response(text: str) -> dict:
         elif not isinstance(c["details"], dict):
             raise ValueError(f"criterion {cid!r}: details must be an object")
     return data
+
+
+COMPARE_PROMPT = """You are a meticulous visual inspector comparing a real product
+photo against a previously-analyzed 2D mockup.
+
+You receive: a JSON report from the mockup (sim_report) and a photo of the
+real product.
+
+For EACH criterion in sim_report: find it in the real photo, decide if it
+matches. Additionally: identify criteria visible on the real product that were
+NOT in sim_report (extras).
+
+## Strict rules
+
+1. Respond with a SINGLE valid JSON object, no prose.
+2. All field values in English.
+3. One row per sim criterion (in order), then rows for extras found only on the
+   real product.
+4. `match: true` ONLY when both `sim_value` and `real_value` are non-null AND
+   describe the same thing (semantically — "navy blue" and "dark navy" match;
+   "navy blue" and "red" do not).
+5. `match_type` is one of: exact, semantic, partial, missing_in_real, extra_on_real.
+6. `confidence` is one of: high, medium, low.
+7. NEVER claim match: true for something you cannot see in the real photo.
+   If a criterion is in sim but you cannot see it (back of product, occluded,
+   out of frame), set real_value: null, match: false,
+   match_type: "missing_in_real", confidence: "low", and explain in note.
+8. note is mandatory — one sentence justifying the decision.
+9. differences lists specific visual discrepancies, empty list when match is exact.
+10. real_details mirrors the structure of sim_details where possible.
+11. summary.total must equal len(rows). summary.matched + summary.mismatched
+    must equal summary.total. Recount carefully.
+12. real_overall describes the photo: view_angle, lighting, image_quality,
+    obstructions.
+
+## Output schema
+
+{
+  "pair": "<base name>",
+  "sim_image": "<from sim_report.source_image>",
+  "real_image": "<filename from user message>",
+  "real_overall": {
+    "view_angle": "...", "lighting": "...",
+    "image_quality": "...", "obstructions": []
+  },
+  "rows": [
+    {
+      "criterion": "<label or new label for extras>",
+      "sim_value": "<sim value or null if extra_on_real>",
+      "real_value": "<real value or null if missing_in_real>",
+      "sim_details": { /* from sim_report or null */ },
+      "real_details": { /* what you observe or null */ },
+      "match": true | false,
+      "match_type": "exact | semantic | partial | missing_in_real | extra_on_real",
+      "confidence": "high | medium | low",
+      "differences": ["..."],
+      "note": "<one-sentence justification>"
+    }
+  ],
+  "summary": {
+    "total": <int>, "matched": <int>, "mismatched": <int>,
+    "by_match_type": { "exact": <int>, "semantic": <int>, "partial": <int>,
+                        "missing_in_real": <int>, "extra_on_real": <int> },
+    "by_confidence": { "high": <int>, "medium": <int>, "low": <int> }
+  }
+}
+"""
+
+
+def build_compare_messages(
+    sim_report: dict, image_b64: str, media_type: str, filename: str
+) -> tuple[str, list[dict]]:
+    """Return (system_prompt, messages) for the comparison LLM call."""
+    sim_json = json.dumps(sim_report, indent=2, ensure_ascii=False)
+    user_text = (
+        f"The real product photo filename is {filename!r}. Use it verbatim in "
+        f"the `real_image` field. The mockup analysis (sim_report) is:\n\n"
+        f"```json\n{sim_json}\n```\n\n"
+        f"Return the JSON described in the system prompt."
+    )
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": image_b64,
+                    },
+                },
+                {"type": "text", "text": user_text},
+            ],
+        }
+    ]
+    return COMPARE_PROMPT, messages
