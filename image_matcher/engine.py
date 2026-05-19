@@ -8,8 +8,12 @@ process_pair) are verified manually with the checklist in README.md.
 import base64
 import json
 import logging
+import os
 import re
+import time
 from pathlib import Path
+
+from anthropic import Anthropic, APIStatusError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -413,3 +417,111 @@ def render_table(report: dict, width: int = 80) -> str:
         lines.append(row(r["criterion"], r.get("sim_value"), r.get("real_value"), mark))
     lines.append(sep_bot)
     return "\n".join(lines)
+
+
+def call_llm(
+    system: str,
+    messages: list[dict],
+    model: str = "claude-sonnet-4-6",
+    max_tokens: int = 4096,
+) -> str:
+    """Single API call to Anthropic. One retry on rate-limit or 5xx.
+
+    Returns the text body of the first content block. Raises any other error
+    with context preserved.
+    """
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    for attempt in range(2):
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=messages,
+            )
+            return resp.content[0].text
+        except (RateLimitError, APIStatusError) as e:
+            status = getattr(e, "status_code", None)
+            if attempt == 0 and (isinstance(e, RateLimitError) or (status and 500 <= status < 600)):
+                logger.warning("retry-able LLM error (%s); retrying once", e)
+                time.sleep(2)
+                continue
+            raise
+    raise RuntimeError("unreachable")
+
+
+def analyze_sim(sim_path: Path, model: str = "claude-sonnet-4-6") -> dict:
+    """Read sim image → call LLM → parse → return validated sim_report."""
+    media_type, b64 = encode_image(sim_path)
+    system, messages = build_sim_messages(b64, media_type, sim_path.name)
+    raw = call_llm(system, messages, model=model)
+    try:
+        report = parse_sim_response(raw)
+    except ValueError as e:
+        raise ValueError(f"sim parse failed for {sim_path.name}: {e}") from e
+    # Ensure the report carries the actual filename even if the LLM dropped it.
+    report["source_image"] = sim_path.name
+    return report
+
+
+def compare_real(
+    sim_report: dict, real_path: Path, model: str = "claude-sonnet-4-6"
+) -> dict:
+    """Read real image → call LLM with sim_report → parse → return compare_report.
+
+    One retry with a corrective hint if parse fails the first time.
+    """
+    media_type, b64 = encode_image(real_path)
+    system, messages = build_compare_messages(
+        sim_report, b64, media_type, real_path.name
+    )
+    raw = call_llm(system, messages, model=model)
+    try:
+        report = parse_compare_response(raw)
+    except ValueError as first_error:
+        logger.warning(
+            "compare parse failed for %s: %s — retrying with hint",
+            real_path.name,
+            first_error,
+        )
+        retry_messages = [
+            *messages,
+            {"role": "assistant", "content": raw},
+            {
+                "role": "user",
+                "content": (
+                    f"Your previous response had this validation error: "
+                    f"{first_error}. Please correct and return ONLY the valid "
+                    f"JSON object."
+                ),
+            },
+        ]
+        raw = call_llm(system, retry_messages, model=model)
+        report = parse_compare_response(raw)  # raises if still bad
+    report["real_image"] = real_path.name
+    return report
+
+
+def process_pair(
+    base: str,
+    sim_path: Path,
+    real_path: Path,
+    output_dir: Path,
+    model: str = "claude-sonnet-4-6",
+) -> dict:
+    """Full pipeline for one pair. Saves sim.json + compare.json under
+    output_dir/<base>/. Returns the compare report."""
+    pair_dir = output_dir / base
+    pair_dir.mkdir(parents=True, exist_ok=True)
+
+    sim_report = analyze_sim(sim_path, model=model)
+    (pair_dir / "sim.json").write_text(
+        json.dumps(sim_report, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    compare_report = compare_real(sim_report, real_path, model=model)
+    compare_report["pair"] = base  # canonical, overrides whatever LLM wrote
+    (pair_dir / "compare.json").write_text(
+        json.dumps(compare_report, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    return compare_report
