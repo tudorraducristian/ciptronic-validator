@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# image_matcher local artifacts
+image_matcher/.env
+image_matcher/input/*
+!image_matcher/input/.gitkeep
+image_matcher/output/
