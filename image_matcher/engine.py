@@ -298,3 +298,71 @@ def build_compare_messages(
         }
     ]
     return COMPARE_PROMPT, messages
+
+
+_MATCH_TYPES = {"exact", "semantic", "partial", "missing_in_real", "extra_on_real"}
+_CONFIDENCES = {"high", "medium", "low"}
+
+
+def parse_compare_response(text: str) -> dict:
+    """Parse and validate the comparison JSON. Raise ValueError on any issue."""
+    data = _extract_json(text)
+    if not isinstance(data, dict):
+        raise ValueError("response must be a JSON object")
+
+    rows = data.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("'rows' must be a non-empty list")
+
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"row {i} is not an object")
+        for field in ("criterion", "match", "match_type", "confidence", "note"):
+            if field not in row:
+                raise ValueError(f"row {i}: missing field {field!r}")
+        if not isinstance(row["note"], str) or not row["note"].strip():
+            raise ValueError(f"row {i}: note must be a non-empty string")
+        if row["match_type"] not in _MATCH_TYPES:
+            raise ValueError(
+                f"row {i}: invalid match_type {row['match_type']!r}, "
+                f"allowed: {sorted(_MATCH_TYPES)}"
+            )
+        if row["confidence"] not in _CONFIDENCES:
+            raise ValueError(
+                f"row {i}: invalid confidence {row['confidence']!r}, "
+                f"allowed: {sorted(_CONFIDENCES)}"
+            )
+        sim_val = row.get("sim_value")
+        real_val = row.get("real_value")
+        if row["match"] is True and (sim_val is None or real_val is None):
+            raise ValueError(
+                f"row {i}: cannot have match=true with a null value"
+            )
+        if row["match_type"] == "missing_in_real" and real_val is not None:
+            raise ValueError(
+                f"row {i}: match_type=missing_in_real requires real_value=null"
+            )
+        if row["match_type"] == "extra_on_real" and sim_val is not None:
+            raise ValueError(
+                f"row {i}: match_type=extra_on_real requires sim_value=null"
+            )
+
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        raise ValueError("missing or invalid 'summary' object")
+    if summary.get("total") != len(rows):
+        raise ValueError(
+            f"summary.total={summary.get('total')} but rows has {len(rows)}"
+        )
+    matched_count = sum(1 for r in rows if r["match"] is True)
+    mismatched_count = len(rows) - matched_count
+    if summary.get("matched") != matched_count:
+        raise ValueError(
+            f"summary.matched={summary.get('matched')} but actual is {matched_count}"
+        )
+    if summary.get("mismatched") != mismatched_count:
+        raise ValueError(
+            f"summary.mismatched={summary.get('mismatched')} but actual is "
+            f"{mismatched_count}"
+        )
+    return data

@@ -280,3 +280,139 @@ def test_build_compare_messages_structure():
     # The sim_report JSON should be embedded so the LLM sees it.
     assert "main_color" in text
     assert "chest_logo" in text
+
+
+from image_matcher.engine import parse_compare_response
+
+
+def _valid_compare_dict():
+    return {
+        "pair": "t01",
+        "sim_image": "t01_sim.png",
+        "real_image": "t01_real.jpg",
+        "real_overall": {
+            "view_angle": "front",
+            "lighting": "daylight",
+            "image_quality": "sharp",
+            "obstructions": [],
+        },
+        "rows": [
+            {
+                "criterion": "main color",
+                "sim_value": "navy",
+                "real_value": "navy",
+                "sim_details": {"color_hex_approx": "#1B2A4E"},
+                "real_details": {"color_hex_approx": "#15233F"},
+                "match": True,
+                "match_type": "semantic",
+                "confidence": "high",
+                "differences": ["minor hex drift"],
+                "note": "matches semantically",
+            },
+            {
+                "criterion": "back text",
+                "sim_value": "TEAM 2026",
+                "real_value": None,
+                "sim_details": {"text_content": "TEAM 2026"},
+                "real_details": None,
+                "match": False,
+                "match_type": "missing_in_real",
+                "confidence": "low",
+                "differences": ["back not visible"],
+                "note": "cannot verify back",
+            },
+        ],
+        "summary": {
+            "total": 2,
+            "matched": 1,
+            "mismatched": 1,
+            "by_match_type": {
+                "exact": 0,
+                "semantic": 1,
+                "partial": 0,
+                "missing_in_real": 1,
+                "extra_on_real": 0,
+            },
+            "by_confidence": {"high": 1, "medium": 0, "low": 1},
+        },
+    }
+
+
+def test_parse_compare_response_valid():
+    report = parse_compare_response(json.dumps(_valid_compare_dict()))
+    assert len(report["rows"]) == 2
+    assert report["summary"]["total"] == 2
+
+
+def test_parse_compare_response_invalid_match_type():
+    d = _valid_compare_dict()
+    d["rows"][0]["match_type"] = "wrong"
+    with pytest.raises(ValueError, match="match_type"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_invalid_confidence():
+    d = _valid_compare_dict()
+    d["rows"][0]["confidence"] = "definitely"
+    with pytest.raises(ValueError, match="confidence"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_match_true_with_null():
+    d = _valid_compare_dict()
+    d["rows"][1]["match"] = True  # row has real_value None
+    with pytest.raises(ValueError, match="match=true"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_missing_in_real_with_non_null_real():
+    d = _valid_compare_dict()
+    d["rows"][1]["real_value"] = "something"  # but match_type is missing_in_real
+    with pytest.raises(ValueError, match="missing_in_real"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_summary_total_mismatch():
+    d = _valid_compare_dict()
+    d["summary"]["total"] = 5
+    with pytest.raises(ValueError, match="summary.total"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_summary_matched_mismatched_sum_wrong():
+    d = _valid_compare_dict()
+    d["summary"]["matched"] = 2
+    d["summary"]["mismatched"] = 2
+    with pytest.raises(ValueError, match="matched"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_empty_note():
+    d = _valid_compare_dict()
+    d["rows"][0]["note"] = ""
+    with pytest.raises(ValueError, match="note"):
+        parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_extra_on_real_with_non_null_sim():
+    d = _valid_compare_dict()
+    d["rows"].append(
+        {
+            "criterion": "stitch",
+            "sim_value": "something",  # should be null for extra_on_real
+            "real_value": "double stitch",
+            "sim_details": None,
+            "real_details": {"stitch_type": "double"},
+            "match": False,
+            "match_type": "extra_on_real",
+            "confidence": "high",
+            "differences": ["extra"],
+            "note": "extra on real",
+        }
+    )
+    d["summary"]["total"] = 3
+    d["summary"]["mismatched"] = 2
+    d["summary"]["by_match_type"]["extra_on_real"] = 1
+    d["summary"]["by_confidence"]["high"] = 2
+    with pytest.raises(ValueError, match="extra_on_real"):
+        parse_compare_response(json.dumps(d))
