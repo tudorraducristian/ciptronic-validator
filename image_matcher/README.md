@@ -33,3 +33,17 @@ From project root:
 ```
 python -m pytest image_matcher/tests/ -v
 ```
+
+## Manual verification checklist
+
+After setting `ANTHROPIC_API_KEY` in the environment:
+
+- [ ] `python -m pytest image_matcher/tests/ -v` → all pass, sub 2s
+- [ ] Place `image_matcher/input/tshirt_01_sim.png` + `image_matcher/input/tshirt_01_real.jpg`
+- [ ] `python -m image_matcher.run` → ASCII table printed with aligned columns
+- [ ] `image_matcher/output/tshirt_01/sim.json` exists, has ≥ 4 criteria with non-empty `details`
+- [ ] `image_matcher/output/tshirt_01/compare.json` exists, `summary.total == len(rows)`
+- [ ] An element absent in real (e.g. back text) → row marked `missing_in_real`, `confidence: low`
+- [ ] An element extra on real (e.g. visible stitch detail) → row marked `extra_on_real`
+- [ ] Add a second pair `tshirt_02_*` → batch runs both, prints `[1/2]` and `[2/2]`
+- [ ] An orphan pair (one side missing) → warning logged, pair skipped, batch continues
