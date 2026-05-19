@@ -6,7 +6,9 @@ function (`call_llm`) and the orchestrators (analyze_sim, compare_real,
 process_pair) are verified manually with the checklist in README.md.
 """
 import base64
+import json
 import logging
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -144,3 +146,58 @@ def build_sim_messages(
         }
     ]
     return SIM_PROMPT, messages
+
+
+_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
+
+
+def _extract_json(text: str) -> dict:
+    """Try direct parse first; if it fails, find the outermost {...} block."""
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError(f"not valid JSON: {text[:80]!r}")
+    try:
+        return json.loads(text[start : end + 1])
+    except json.JSONDecodeError as e:
+        raise ValueError(f"not valid JSON: {e}") from e
+
+
+def parse_sim_response(text: str) -> dict:
+    """Parse and validate the sim-analysis JSON. Raise ValueError on any issue."""
+    data = _extract_json(text)
+    if not isinstance(data, dict):
+        raise ValueError("response must be a JSON object")
+    if "overall" not in data or not isinstance(data["overall"], dict):
+        raise ValueError("missing or invalid 'overall' object")
+    if not data["overall"].get("description"):
+        raise ValueError("overall must contain non-empty 'description'")
+    if "criteria" not in data:
+        raise ValueError("missing 'criteria' list")
+    if not isinstance(data["criteria"], list) or not data["criteria"]:
+        raise ValueError("'criteria' must be a non-empty list")
+
+    seen_ids: set[str] = set()
+    required = ("id", "label", "value", "location")
+    for i, c in enumerate(data["criteria"]):
+        if not isinstance(c, dict):
+            raise ValueError(f"criterion {i} is not an object")
+        for field in required:
+            if not c.get(field):
+                raise ValueError(f"criterion {i}: missing or empty field {field!r}")
+        cid = c["id"]
+        if not _ID_PATTERN.match(cid):
+            raise ValueError(f"criterion {i}: invalid id format {cid!r}")
+        if cid in seen_ids:
+            raise ValueError(f"duplicate criterion id {cid!r}")
+        seen_ids.add(cid)
+        if "details" not in c:
+            c["details"] = {}
+        elif not isinstance(c["details"], dict):
+            raise ValueError(f"criterion {cid!r}: details must be an object")
+    return data

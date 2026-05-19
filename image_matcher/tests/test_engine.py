@@ -158,3 +158,91 @@ def test_build_sim_messages_structure():
 
     assert len(text_blocks) == 1
     assert "tshirt_01_sim.png" in text_blocks[0]["text"]
+
+
+import json
+from image_matcher.engine import parse_sim_response
+
+
+def _valid_sim_dict():
+    return {
+        "source_image": "x.png",
+        "overall": {"description": "a t-shirt"},
+        "criteria": [
+            {
+                "id": "main_color",
+                "label": "main color",
+                "value": "navy blue",
+                "location": "body",
+                "details": {},
+            },
+            {
+                "id": "chest_logo",
+                "label": "chest logo",
+                "value": "white circle",
+                "location": "left chest",
+                "details": {"shape": "circle"},
+            },
+        ],
+    }
+
+
+def test_parse_sim_response_valid():
+    report = parse_sim_response(json.dumps(_valid_sim_dict()))
+    assert report["source_image"] == "x.png"
+    assert len(report["criteria"]) == 2
+    assert report["criteria"][0]["id"] == "main_color"
+
+
+def test_parse_sim_response_strips_prose_wrapping():
+    payload = "Here you go:\n" + json.dumps(_valid_sim_dict()) + "\nDone."
+    # The LLM may pad despite instructions; parser should still extract.
+    report = parse_sim_response(payload)
+    assert report["criteria"][0]["id"] == "main_color"
+
+
+def test_parse_sim_response_invalid_json():
+    with pytest.raises(ValueError, match="not valid JSON"):
+        parse_sim_response("totally not json")
+
+
+def test_parse_sim_response_missing_criteria():
+    d = _valid_sim_dict()
+    del d["criteria"]
+    with pytest.raises(ValueError, match="criteria"):
+        parse_sim_response(json.dumps(d))
+
+
+def test_parse_sim_response_missing_overall():
+    d = _valid_sim_dict()
+    del d["overall"]
+    with pytest.raises(ValueError, match="overall"):
+        parse_sim_response(json.dumps(d))
+
+
+def test_parse_sim_response_empty_criteria():
+    d = _valid_sim_dict()
+    d["criteria"] = []
+    with pytest.raises(ValueError, match="empty"):
+        parse_sim_response(json.dumps(d))
+
+
+def test_parse_sim_response_duplicate_id():
+    d = _valid_sim_dict()
+    d["criteria"][1]["id"] = "main_color"
+    with pytest.raises(ValueError, match="duplicate"):
+        parse_sim_response(json.dumps(d))
+
+
+def test_parse_sim_response_invalid_id_format():
+    d = _valid_sim_dict()
+    d["criteria"][0]["id"] = "Main Color"
+    with pytest.raises(ValueError, match="invalid id"):
+        parse_sim_response(json.dumps(d))
+
+
+def test_parse_sim_response_missing_criterion_field():
+    d = _valid_sim_dict()
+    del d["criteria"][0]["value"]
+    with pytest.raises(ValueError, match="value"):
+        parse_sim_response(json.dumps(d))
