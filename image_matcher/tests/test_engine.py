@@ -128,3 +128,33 @@ def test_encode_image_too_large(tmp_path):
 def test_encode_image_missing(tmp_path):
     with pytest.raises(FileNotFoundError):
         encode_image(tmp_path / "nope.png")
+
+
+from image_matcher.engine import SIM_PROMPT, build_sim_messages
+
+
+def test_sim_prompt_exists():
+    assert isinstance(SIM_PROMPT, str)
+    assert "JSON" in SIM_PROMPT
+    assert "criteria" in SIM_PROMPT
+
+
+def test_build_sim_messages_structure():
+    system, messages = build_sim_messages("BASE64DATA", "image/png", "tshirt_01_sim.png")
+
+    assert system == SIM_PROMPT
+    assert isinstance(messages, list)
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+
+    content = messages[0]["content"]
+    image_blocks = [b for b in content if b["type"] == "image"]
+    text_blocks = [b for b in content if b["type"] == "text"]
+
+    assert len(image_blocks) == 1
+    assert image_blocks[0]["source"]["type"] == "base64"
+    assert image_blocks[0]["source"]["media_type"] == "image/png"
+    assert image_blocks[0]["source"]["data"] == "BASE64DATA"
+
+    assert len(text_blocks) == 1
+    assert "tshirt_01_sim.png" in text_blocks[0]["text"]
