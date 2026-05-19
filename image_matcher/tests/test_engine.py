@@ -416,3 +416,34 @@ def test_parse_compare_response_extra_on_real_with_non_null_sim():
     d["summary"]["by_confidence"]["high"] = 2
     with pytest.raises(ValueError, match="extra_on_real"):
         parse_compare_response(json.dumps(d))
+
+
+from image_matcher.engine import render_table
+
+
+def test_render_table_basic():
+    report = _valid_compare_dict()
+    out = render_table(report)
+    assert "Criterion" in out
+    assert "Sim" in out
+    assert "Real" in out
+    assert "Match" in out
+    assert "main color" in out
+    assert "✓" in out
+    assert "✗" in out
+
+
+def test_render_table_null_displays_dash():
+    report = _valid_compare_dict()
+    out = render_table(report)
+    # row with real_value=None should show em-dash
+    assert "—" in out
+
+
+def test_render_table_truncates_long_values():
+    report = _valid_compare_dict()
+    report["rows"][0]["sim_value"] = "a" * 200
+    out = render_table(report, width=80)
+    assert "…" in out
+    longest_line = max(len(line) for line in out.splitlines())
+    assert longest_line <= 80

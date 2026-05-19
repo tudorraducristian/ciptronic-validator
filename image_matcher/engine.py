@@ -366,3 +366,50 @@ def parse_compare_response(text: str) -> dict:
             f"{mismatched_count}"
         )
     return data
+
+
+def render_table(report: dict, width: int = 80) -> str:
+    """Render the compare report as an ASCII table that fits within `width`.
+
+    Columns: Criterion | Sim | Real | Match. Long values are truncated with `…`;
+    null values are rendered as `—`.
+    """
+    rows = report.get("rows", [])
+    if not rows:
+        return "(no rows)"
+
+    # Fixed-width Match column (✓/✗ inside |   X   |): 5 inner chars.
+    match_col = 5
+    borders_overhead = 13  # 5 vertical bars + 4 padding pairs (1 space each side)
+    available = max(width - match_col - borders_overhead, 24)
+    # Split available evenly across the three text columns.
+    col_w = available // 3
+    crit_w = col_w
+    sim_w = col_w
+    real_w = available - crit_w - sim_w
+
+    def cell(value, w: int) -> str:
+        if value is None:
+            text = "—"
+        else:
+            text = str(value)
+        if len(text) > w:
+            text = text[: w - 1] + "…"
+        return text.ljust(w)
+
+    sep_top = "┌" + "─" * (crit_w + 2) + "┬" + "─" * (sim_w + 2) + "┬" + "─" * (real_w + 2) + "┬" + "─" * (match_col + 2) + "┐"
+    sep_mid = "├" + "─" * (crit_w + 2) + "┼" + "─" * (sim_w + 2) + "┼" + "─" * (real_w + 2) + "┼" + "─" * (match_col + 2) + "┤"
+    sep_bot = "└" + "─" * (crit_w + 2) + "┴" + "─" * (sim_w + 2) + "┴" + "─" * (real_w + 2) + "┴" + "─" * (match_col + 2) + "┘"
+
+    def row(c, s, r, m):
+        return (
+            f"│ {cell(c, crit_w)} │ {cell(s, sim_w)} │ {cell(r, real_w)} "
+            f"│ {m.center(match_col)} │"
+        )
+
+    lines = [sep_top, row("Criterion", "Sim", "Real", "Match"), sep_mid]
+    for r in rows:
+        mark = "✓" if r["match"] else "✗"
+        lines.append(row(r["criterion"], r.get("sim_value"), r.get("real_value"), mark))
+    lines.append(sep_bot)
+    return "\n".join(lines)
