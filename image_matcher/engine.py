@@ -52,29 +52,44 @@ def find_pairs(folder: Path) -> list[tuple[str, Path, Path]]:
     return pairs
 
 
-_MEDIA_TYPES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-}
+_ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def _detect_media_type(data: bytes) -> str | None:
+    """Detect image media_type from magic bytes; None if unrecognized.
+
+    Users frequently rename files (.png → .jpg) without re-exporting, so the
+    extension is unreliable; Anthropic detects magic bytes and 400s on
+    mismatches. We mirror that detection.
+    """
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def encode_image(path: Path) -> tuple[str, str]:
     """Read an image file, return (media_type, base64_data).
 
-    Raises ValueError on unsupported extension or files > 5MB.
-    Raises FileNotFoundError if path does not exist.
+    Raises ValueError on unsupported extension, unrecognized magic bytes, or
+    files > 5MB. Raises FileNotFoundError if path does not exist.
     """
     ext = path.suffix.lower()
-    media_type = _MEDIA_TYPES.get(ext)
-    if media_type is None:
+    if ext not in _ALLOWED_EXTS:
         raise ValueError(f"unsupported image extension: {ext!r}")
     data_bytes = path.read_bytes()
     if len(data_bytes) > _MAX_IMAGE_BYTES:
         raise ValueError(
             f"{path.name} ({len(data_bytes)} bytes) exceeds 5MB limit"
+        )
+    media_type = _detect_media_type(data_bytes)
+    if media_type is None:
+        raise ValueError(
+            f"{path.name}: cannot detect image format from magic bytes"
         )
     return media_type, base64.b64encode(data_bytes).decode("ascii")
 

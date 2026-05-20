@@ -117,6 +117,25 @@ def test_encode_image_unsupported_extension(tmp_path):
         encode_image(path)
 
 
+def test_encode_image_png_renamed_as_jpg(tmp_path):
+    # Real-world: user renames .png to .jpg without re-exporting; magic bytes
+    # win over the extension so Anthropic gets the correct media_type.
+    path = tmp_path / "mislabeled.jpg"
+    path.write_bytes(b"\x89PNG\r\n\x1a\nfakecontent")
+
+    media_type, _ = encode_image(path)
+
+    assert media_type == "image/png"
+
+
+def test_encode_image_unrecognized_magic_bytes(tmp_path):
+    path = tmp_path / "a.png"
+    path.write_bytes(b"not an image at all")
+
+    with pytest.raises(ValueError, match="cannot detect image format"):
+        encode_image(path)
+
+
 def test_encode_image_too_large(tmp_path):
     path = tmp_path / "a.png"
     path.write_bytes(b"\x00" * (5 * 1024 * 1024 + 1))
