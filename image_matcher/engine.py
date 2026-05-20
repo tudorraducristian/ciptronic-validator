@@ -439,7 +439,10 @@ def call_llm(
     Returns the text body of the first content block. Raises any other error
     with context preserved.
     """
-    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    # Strip whitespace: httpx/h11 rejects headers with leading/trailing
+    # whitespace as LocalProtocolError, which the Anthropic SDK surfaces as
+    # the deeply misleading "Connection error." Defensive trim avoids it.
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"].strip())
     for attempt in range(2):
         try:
             resp = client.messages.create(
