@@ -492,17 +492,21 @@ def analyze_sim(sim_path: Path, model: str = "claude-sonnet-4-6") -> dict:
 
 
 def compare_real(
-    sim_report: dict, real_path: Path, model: str = "claude-sonnet-4-6"
+    sim_report: dict,
+    real_path: Path,
+    model: str = "claude-sonnet-4-6",
+    max_tokens: int = 8192,
 ) -> dict:
     """Read real image → call LLM with sim_report → parse → return compare_report.
 
-    One retry with a corrective hint if parse fails the first time.
+    One retry with a corrective hint if parse fails the first time. 8192 covers
+    ~17-20 criteria; products with 30+ criteria may need a higher cap.
     """
     media_type, b64 = encode_image(real_path)
     system, messages = build_compare_messages(
         sim_report, b64, media_type, real_path.name
     )
-    raw = call_llm(system, messages, model=model, max_tokens=8192)
+    raw = call_llm(system, messages, model=model, max_tokens=max_tokens)
     try:
         report = parse_compare_response(raw)
     except ValueError as first_error:
@@ -523,7 +527,7 @@ def compare_real(
                 ),
             },
         ]
-        raw = call_llm(system, retry_messages, model=model, max_tokens=8192)
+        raw = call_llm(system, retry_messages, model=model, max_tokens=max_tokens)
         report = parse_compare_response(raw)  # raises if still bad
     report["real_image"] = real_path.name
     return report
@@ -535,9 +539,11 @@ def process_pair(
     real_path: Path,
     output_dir: Path,
     model: str = "claude-sonnet-4-6",
+    max_tokens: int = 8192,
 ) -> dict:
     """Full pipeline for one pair. Saves sim.json + compare.json under
-    output_dir/<base>/. Returns the compare report."""
+    output_dir/<base>/. Returns the compare report. `max_tokens` caps the
+    compare call only; sim analysis uses the call_llm default (4096)."""
     pair_dir = output_dir / base
     pair_dir.mkdir(parents=True, exist_ok=True)
 
@@ -546,7 +552,9 @@ def process_pair(
         json.dumps(sim_report, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    compare_report = compare_real(sim_report, real_path, model=model)
+    compare_report = compare_real(
+        sim_report, real_path, model=model, max_tokens=max_tokens
+    )
     compare_report["pair"] = base  # canonical, overrides whatever LLM wrote
     (pair_dir / "compare.json").write_text(
         json.dumps(compare_report, indent=2, ensure_ascii=False), encoding="utf-8"

@@ -28,6 +28,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="Folder where per-pair output is written.")
     parser.add_argument("--model", default="claude-sonnet-4-6",
                         help="Anthropic model id.")
+    parser.add_argument("--max-tokens", type=int, default=8192,
+                        help="Max output tokens for the compare call. "
+                             "Default 8192 covers ~17-20 criteria; raise for "
+                             "products with 30+ criteria.")
     parser.add_argument("--verbose", action="store_true",
                         help="Enable INFO logging.")
     args = parser.parse_args(argv)
@@ -51,7 +55,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n[{i}/{len(pairs)}] {base}:")
         print(f"  → analyzing {sim.name} ... (via LLM)")
         try:
-            report = process_pair(base, sim, real, args.output, model=args.model)
+            report = process_pair(
+                base, sim, real, args.output,
+                model=args.model, max_tokens=args.max_tokens,
+            )
         except Exception as e:  # batch must continue
             print(f"  ✗ failed: {e}", file=sys.stderr)
             failures += 1
