@@ -26,6 +26,24 @@ python -m image_matcher.run
 Outputs go to `image_matcher/output/<base>/sim.json` and
 `image_matcher/output/<base>/compare.json`. ASCII table prints to terminal.
 
+## Run UI
+
+From project root, with `ANTHROPIC_API_KEY` set:
+
+```
+streamlit run image_matcher/app.py
+```
+
+The browser opens at `http://localhost:8501`. Type a pair name (letters,
+digits and `_` only), upload the mockup in the left slot ("Imagine sim") and
+the real photo in the right slot ("Imagine real"), then click "Analizează".
+After ~30-60s the result table appears with three metrics (Total / Matched /
+Mismatched) and one row per criterion. Uploaded files are written to
+`image_matcher/input/<name>_sim.<ext>` / `<name>_real.<ext>` and the
+comparison report to `image_matcher/output/<name>/compare.json`.
+
+The CLI workflow (`python -m image_matcher.run`) keeps working unchanged.
+
 ## Tests
 
 From project root:

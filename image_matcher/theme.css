@@ -1,0 +1,226 @@
+/* image_matcher/theme.css — editorial/atelier theme for the Streamlit UI.
+ *
+ * Aesthetic direction (locked): ivory canvas, charcoal ink, single vermilion
+ * accent. Fonts: Fraunces (variable serif display) + Geist (body). Avoids
+ * generic Streamlit/Tailwind defaults; principles distilled from
+ * image_matcher/CLAUDE.md and Front-end design.md. */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Geist:wght@400;500;600&display=swap');
+
+:root {
+  --bg-ivory:    #F5F1EA;
+  --bg-card:     #FFFFFF;
+  --ink:         #1A1817;
+  --ink-muted:   #5C5650;
+  --accent:      #C13B1A;       /* vermilion */
+  --accent-soft: rgba(193, 59, 26, 0.08);
+  --border:      #E0DAD0;
+  --shadow-sm:   0 1px 2px rgba(26, 24, 23, 0.04),
+                 0 2px 8px rgba(26, 24, 23, 0.04);
+  --shadow-md:   0 4px 12px rgba(26, 24, 23, 0.06),
+                 0 8px 24px rgba(26, 24, 23, 0.05);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-testid="stAppViewContainer"] { background: var(--bg-ivory); }
+[data-testid="stHeader"] { background: transparent; }
+
+html, body,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] label,
+.stTextInput input,
+.stFileUploader,
+[data-testid="stMetricLabel"],
+[data-testid="stMetricValue"] {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  color: var(--ink);
+}
+
+[data-testid="stMarkdownContainer"] h1 {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-weight: 600;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin-bottom: 0.25rem;
+}
+
+[data-testid="stCaptionContainer"] {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-style: italic;
+  color: var(--ink-muted);
+  font-size: 1rem;
+}
+
+.stTextInput input {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.stTextInput input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+
+[data-testid="stFileUploader"] section {
+  background: var(--bg-card);
+  border: 1.5px dashed var(--border);
+  border-radius: 4px;
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
+}
+[data-testid="stFileUploader"] section:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Override Streamlit's dark default on the inner "Browse files" button so its
+ * label stays legible on our ivory canvas. */
+[data-testid="stFileUploader"] button,
+[data-testid="stFileUploaderDropzone"] button {
+  background: transparent !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border) !important;
+  font-family: 'Geist', sans-serif !important;
+  font-weight: 500;
+  font-size: 0.85rem;
+  border-radius: 2px;
+}
+[data-testid="stFileUploader"] button:hover,
+[data-testid="stFileUploaderDropzone"] button:hover {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+}
+
+/* Drag-and-drop instruction text inside the uploader. */
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] * {
+  color: var(--ink-muted) !important;
+}
+
+/* Make the text-input placeholder readable on ivory. */
+.stTextInput input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.7;
+}
+
+.stButton > button[kind="primary"] {
+  background: var(--accent);
+  color: var(--bg-ivory) !important;
+  border: none;
+  border-radius: 3px;
+  padding: 0.85rem 2rem;
+  font-family: 'Geist', sans-serif !important;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  box-shadow:
+    0 1px 2px rgba(193, 59, 26, 0.15),
+    0 4px 12px rgba(193, 59, 26, 0.12);
+  transition: transform 0.18s var(--ease-spring),
+              box-shadow 0.18s ease-out,
+              background 0.18s ease-out;
+  cursor: pointer;
+}
+/* Force text colour on all child spans (Streamlit nests the label). */
+.stButton > button[kind="primary"] * {
+  color: var(--bg-ivory) !important;
+}
+.stButton > button[kind="primary"]:hover:not(:disabled) {
+  background: #A82F11;
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 10px rgba(193, 59, 26, 0.25),
+    0 12px 28px rgba(193, 59, 26, 0.20);
+}
+.stButton > button[kind="primary"]:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px rgba(193, 59, 26, 0.15),
+    0 2px 6px rgba(193, 59, 26, 0.12);
+}
+.stButton > button[kind="primary"]:focus-visible:not(:disabled) {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(193, 59, 26, 0.30),
+    0 4px 12px rgba(193, 59, 26, 0.20);
+}
+.stButton > button[kind="primary"]:disabled {
+  background: var(--ink-muted);
+  color: var(--bg-ivory) !important;
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.stButton > button[kind="primary"]:disabled * {
+  color: var(--bg-ivory) !important;
+}
+
+[data-testid="stMetric"] {
+  background: var(--bg-card);
+  padding: 1rem 1.25rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+[data-testid="stMetricValue"] {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+}
+
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+/* st.table: wraps text inside cells natively, no horizontal scroll. */
+[data-testid="stTable"] table {
+  background: var(--bg-card);
+  border-collapse: collapse;
+  font-family: 'Geist', sans-serif;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+[data-testid="stTable"] thead th {
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 2px solid var(--accent);
+  text-align: left;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+[data-testid="stTable"] tbody td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.5;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+[data-testid="stTable"] tbody tr:last-child td {
+  border-bottom: none;
+}
+
+hr { border-color: var(--border); opacity: 0.6; }
+
+/* Accessibility: respect user OS-level reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .stButton > button[kind="primary"]:hover:not(:disabled) {
+    transform: none;
+  }
+}

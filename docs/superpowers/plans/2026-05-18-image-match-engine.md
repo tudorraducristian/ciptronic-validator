@@ -1571,12 +1571,429 @@ This step does NOT auto-pass. The implementer reports back to the user; user ver
 
 ---
 
+## Task 12: Streamlit UI (planned 2026-05-26)
+
+Add a minimal Streamlit UI on top of the existing engine. The engine code is NOT modified — the UI imports `find_pairs` and `process_pair` and reuses them. Goal: replace the terminal-only experience with a single page where the user picks a pair, sees both images side by side, presses a button, and gets the result table in the browser.
+
+**Files:**
+- Modify: `requirements.txt` (root)
+- Create: `image_matcher/app.py`
+- Create: `image_matcher/theme.css`
+- Modify: `image_matcher/README.md`
+- NOT modified: `image_matcher/engine.py`, `image_matcher/run.py`, `image_matcher/tests/`
+
+**Constraint:** ~2.5-3 hours total. No new abstractions, no refactor. UI is a single file plus one CSS file, single page, vertical layout.
+
+**Design choice (locked):** Streamlit. Confirmed by user 2026-05-26. Rationale: Python-only, library is standard for "tool with input → process → output" demos, ~95 lines of UI cover everything needed, engine stays intact, easy to explain at presentation time.
+
+**Distilled principles from `image_matcher/CLAUDE.md` + `Front-end design.md`** (the workflow-specific rules — Tailwind CDN, Puppeteer screenshots, `node serve.mjs`, reference-image matching — are **not** applicable to a Python/Streamlit/Windows stack and are skipped; we keep only the aesthetic principles that we *can* apply by injecting CSS into Streamlit):
+- **Distinctive typography**: avoid Inter/Roboto/Arial/system defaults. Pair a display serif with a clean sans. Apply tight tracking on large headings, generous line-height on body.
+- **Custom palette, not default**: avoid default Streamlit blue/red and default Tailwind indigo/blue. Define semantic CSS variables.
+- **Layered shadows, not flat**: surfaces have an elevation system (base → elevated), not all on the same z-plane.
+- **Animations** on `transform` and `opacity` only, with spring-style easing. Never `transition-all`.
+- **Interactive states**: hover, focus-visible, active, disabled — distinct and visible.
+- **Atmosphere**: subtle background tint + soft texture instead of flat white.
+- **One BOLD direction**, executed with precision: chosen direction is *editorial / atelier* — referencing fashion magazines + quality inspection. Cream/ivory base, charcoal ink, single vermilion accent.
+
+**Layout (locked, upload-only flow):**
+- Centered single-column page (`layout="centered"`).
+- Title (serif display) + one-line caption (italic).
+- `st.text_input` where the user types a pair base name (e.g. `Tricou_05`). Validated against `^[A-Za-z0-9_]+$`.
+- Two `st.file_uploader` widgets side by side: one for the sim image, one for the real image. Accept `png|jpg|jpeg|webp`.
+- When both files are uploaded: side-by-side preview with original filenames as captions.
+- Single primary button "Analizează", **disabled** until base name is valid AND both files uploaded. Spinner during the LLM call.
+- On click: files are saved to `image_matcher/input/<base>_sim.<ext>` + `<base>_real.<ext>` (so the engine's existing path-based API can consume them); then `process_pair` is called.
+- After the call: three metrics (Total / Matched / Mismatched) + `st.dataframe` with columns Criterion / Sim / Real / Match (✅/❌).
+- `@st.cache_data` keyed by `(base, sim_path_str, real_path_str)` so re-clicks on the same inputs don't re-spend tokens.
+- The selector with existing pairs in `input/` is **NOT** part of the UI. The user works exclusively via upload. Files written to `input/` are a side-effect of the upload, not surfaced in the UI.
+- Custom CSS is loaded from a sibling file `image_matcher/theme.css` and injected once at top of `app.py` via `st.markdown(unsafe_allow_html=True)`.
+
+- [ ] **Step 1: Add streamlit to root requirements.txt**
+
+Modify `requirements.txt` (root) to:
+
+```
+anthropic>=0.102.0
+pytest>=9.0.0
+streamlit>=1.40.0
+```
+
+Then install: `.venv\Scripts\pip.exe install streamlit>=1.40.0`.
+
+Verify: `.venv\Scripts\python.exe -c "import streamlit; print(streamlit.__version__)"` prints a version ≥ 1.40.
+
+- [ ] **Step 2: Create `image_matcher/app.py` with the full UI**
+
+```python
+"""Streamlit UI for image_matcher.
+
+Run from project root with: `streamlit run image_matcher/app.py`.
+The engine logic (process_pair) is reused untouched.
+"""
+import re
+from pathlib import Path
+
+import streamlit as st
+
+from image_matcher.engine import process_pair
+
+INPUT_DIR = Path(__file__).parent / "input"
+OUTPUT_DIR = Path(__file__).parent / "output"
+_THEME_CSS_PATH = Path(__file__).parent / "theme.css"
+
+_SUPPORTED_EXTS = ("png", "jpg", "jpeg", "webp")
+_BASE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
+
+st.set_page_config(page_title="Image Match", layout="centered")
+
+# Inject custom theme. Kept in a sibling file so app.py stays focused on logic.
+st.markdown(
+    f"<style>{_THEME_CSS_PATH.read_text(encoding='utf-8')}</style>",
+    unsafe_allow_html=True,
+)
+
+
+def _match_icon(is_match: bool) -> str:
+    # Geometric Unicode symbols, not emoji. ui-ux-pro-max + CLAUDE.md both
+    # forbid emoji-as-icons; ✓ / ✗ render as flat text glyphs.
+    return "✓" if is_match else "✗"
+
+
+@st.cache_data(show_spinner=False)
+def _run_pair(base: str, sim_str: str, real_str: str) -> dict:
+    """Cached wrapper around process_pair. Streamlit hashes by argument values,
+    so the LLM is re-called only when the inputs change."""
+    return process_pair(base, Path(sim_str), Path(real_str), OUTPUT_DIR)
+
+
+st.title("Image Match — Sim vs Real")
+st.caption("Compară un mockup 2D cu fotografia produsului real.")
+
+base_raw = st.text_input(
+    "Nume pereche:",
+    placeholder="ex: Tricou_05 (litere, cifre și _)",
+)
+base = base_raw.strip()
+base_valid = bool(base) and bool(_BASE_NAME_RE.match(base))
+if base and not base_valid:
+    st.warning("Numele poate conține doar litere, cifre și `_` (fără spații).")
+
+col_sim, col_real = st.columns(2)
+with col_sim:
+    sim_file = st.file_uploader(
+        "Imagine sim (mockup)", type=list(_SUPPORTED_EXTS), key="sim_upload",
+    )
+with col_real:
+    real_file = st.file_uploader(
+        "Imagine real", type=list(_SUPPORTED_EXTS), key="real_upload",
+    )
+
+if sim_file and real_file:
+    prev_sim, prev_real = st.columns(2)
+    with prev_sim:
+        st.image(sim_file, caption=sim_file.name, use_container_width=True)
+    with prev_real:
+        st.image(real_file, caption=real_file.name, use_container_width=True)
+
+st.divider()
+
+ready = base_valid and (sim_file is not None) and (real_file is not None)
+if st.button(
+    "Analizează",
+    type="primary",
+    use_container_width=True,
+    disabled=not ready,
+):
+    INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    sim_ext = Path(sim_file.name).suffix.lower()
+    real_ext = Path(real_file.name).suffix.lower()
+    sim_path = INPUT_DIR / f"{base}_sim{sim_ext}"
+    real_path = INPUT_DIR / f"{base}_real{real_ext}"
+    sim_path.write_bytes(sim_file.getvalue())
+    real_path.write_bytes(real_file.getvalue())
+
+    try:
+        with st.spinner("Analizez perechea cu Claude... (poate dura 30-60s)"):
+            report = _run_pair(base, str(sim_path), str(real_path))
+    except KeyError:
+        st.error(
+            "Lipsește variabila de mediu ANTHROPIC_API_KEY. "
+            "Setează-o înainte să pornești UI-ul."
+        )
+        st.stop()
+    except Exception as e:
+        st.error(f"Eroare la analiză: {e}")
+        st.stop()
+
+    summary = report["summary"]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total", summary["total"])
+    c2.metric("Matched", summary["matched"])
+    c3.metric("Mismatched", summary["mismatched"])
+
+    table_rows = [
+        {
+            "Criterion": r["criterion"],
+            "Sim": r.get("sim_value") or "—",
+            "Real": r.get("real_value") or "—",
+            "Match": _match_icon(r["match"]),
+        }
+        for r in report["rows"]
+    ]
+    st.dataframe(table_rows, use_container_width=True, hide_index=True)
+    st.caption(
+        f"Rezultatul complet a fost salvat în "
+        f"{OUTPUT_DIR / base}/compare.json"
+    )
+```
+
+- [ ] **Step 2b: Create `image_matcher/theme.css` with the editorial/atelier theme**
+
+Single file, ~80 lines. Targets Streamlit's stable `data-testid` selectors. Applies the distilled principles: font pairing, custom palette, layered shadows, animations on transform/opacity, distinct interactive states.
+
+```css
+/* image_matcher/theme.css — editorial/atelier theme for the Streamlit UI.
+ *
+ * Aesthetic direction (locked): ivory canvas, charcoal ink, single vermilion
+ * accent. Fonts: Fraunces (variable serif display) + Geist (body). Avoids
+ * generic Streamlit/Tailwind defaults; principles distilled from
+ * image_matcher/CLAUDE.md and Front-end design.md. */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Geist:wght@400;500;600&display=swap');
+
+:root {
+  --bg-ivory:    #F5F1EA;
+  --bg-card:     #FFFFFF;
+  --ink:         #1A1817;
+  --ink-muted:   #5C5650;
+  --accent:      #C13B1A;       /* vermilion */
+  --accent-soft: rgba(193, 59, 26, 0.08);
+  --border:      #E0DAD0;
+  --shadow-sm:   0 1px 2px rgba(26, 24, 23, 0.04),
+                 0 2px 8px rgba(26, 24, 23, 0.04);
+  --shadow-md:   0 4px 12px rgba(26, 24, 23, 0.06),
+                 0 8px 24px rgba(26, 24, 23, 0.05);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-testid="stAppViewContainer"] { background: var(--bg-ivory); }
+[data-testid="stHeader"] { background: transparent; }
+
+html, body,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] label,
+.stTextInput input,
+.stFileUploader,
+[data-testid="stMetricLabel"],
+[data-testid="stMetricValue"] {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  color: var(--ink);
+}
+
+[data-testid="stMarkdownContainer"] h1 {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-weight: 600;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin-bottom: 0.25rem;
+}
+
+[data-testid="stCaptionContainer"] {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-style: italic;
+  color: var(--ink-muted);
+  font-size: 1rem;
+}
+
+.stTextInput input {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+.stTextInput input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+
+[data-testid="stFileUploader"] section {
+  background: var(--bg-card);
+  border: 1.5px dashed var(--border);
+  border-radius: 4px;
+  transition: border-color 0.15s ease-out, background 0.15s ease-out;
+}
+[data-testid="stFileUploader"] section:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stButton > button[kind="primary"] {
+  background: var(--ink);
+  color: var(--bg-ivory);
+  border: none;
+  border-radius: 2px;
+  padding: 0.75rem 1.5rem;
+  font-family: 'Geist', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s var(--ease-spring),
+              box-shadow 0.18s ease-out,
+              background 0.18s ease-out;
+}
+.stButton > button[kind="primary"]:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  background: var(--accent);
+}
+.stButton > button[kind="primary"]:active:not(:disabled) {
+  transform: translateY(0);
+}
+.stButton > button[kind="primary"]:focus-visible:not(:disabled) {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-md);
+}
+.stButton > button[kind="primary"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+[data-testid="stMetric"] {
+  background: var(--bg-card);
+  padding: 1rem 1.25rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+[data-testid="stMetricValue"] {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-weight: 600;
+  font-variation-settings: "opsz" 144;
+}
+
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+hr { border-color: var(--border); opacity: 0.6; }
+
+/* Accessibility: respect user OS-level reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .stButton > button[kind="primary"]:hover:not(:disabled) {
+    transform: none;
+  }
+}
+```
+
+Verify the file is syntactically valid CSS by opening it in any browser DevTools after Step 3 — Streamlit silently swallows broken CSS, so a quick `cat image_matcher/theme.css | head -20` to confirm no garbled chars + visual check in browser is enough.
+
+- [ ] **Step 3: Smoke-test (no API call)**
+
+Run: `.venv\Scripts\streamlit.exe run image_matcher/app.py`
+
+Expected: browser opens at `http://localhost:8501`, page shows title, the "Nume pereche" input is visible, two file uploaders side by side, and the "Analizează" button is **disabled** (grayed out).
+
+Functional checks:
+- [ ] Type `bad name!` in the base input → warning appears about allowed characters.
+- [ ] Type `Test_01` → warning disappears but button stays disabled (no files yet).
+- [ ] Upload one image → button still disabled.
+- [ ] Upload the second image → previews show side by side, button becomes enabled.
+- [ ] Try uploading a `.gif` → uploader rejects it (only `png/jpg/jpeg/webp` accepted).
+
+Visual checks (theme applied):
+- [ ] Background is ivory/cream (not white).
+- [ ] Title is a serif (Fraunces), NOT the default Streamlit sans.
+- [ ] Caption under title is italic serif, muted gray.
+- [ ] File-uploader zones have dashed borders that turn vermilion on hover.
+- [ ] Disabled button looks deliberately disabled (low opacity, no shadow); enabled button is charcoal with subtle shadow.
+- [ ] Hovering the enabled button lifts it slightly (translateY) and turns it vermilion.
+
+Accessibility checks (from ui-ux-pro-max Pre-Delivery Checklist):
+- [ ] Tabbing with keyboard: focus on the enabled button shows a visible ring (`:focus-visible` style) — not removed.
+- [ ] OS-level "reduce motion" enabled (Windows Settings → Accessibility → Visual effects → off): button no longer lifts on hover, no animations play.
+- [ ] No emoji icons in the rendered table — only `✓` / `✗` glyphs.
+
+Do NOT click "Analizează" yet (no API call in this step). Close with Ctrl+C in terminal.
+
+- [ ] **Step 4: End-to-end test with a real upload** (requires `ANTHROPIC_API_KEY`)
+
+1. `$env:ANTHROPIC_API_KEY = "sk-ant-..."` (PowerShell).
+2. `.venv\Scripts\streamlit.exe run image_matcher/app.py`
+3. In the "Nume pereche" field, type `UI_Test_01`.
+4. In the sim uploader: drag-and-drop `image_matcher/input/Geaca_01_sim.png` (or any sim PNG from disk).
+5. In the real uploader: drag-and-drop `image_matcher/input/Geaca_01_real.png`.
+6. Verify previews appear and the button is now enabled.
+7. Click "Analizează".
+8. Verify:
+   - [ ] Spinner appears during the call.
+   - [ ] After ~30-60s, three metrics show non-zero values (around Total=14, Matched=12, Mismatched=2 — exact numbers can drift slightly between LLM runs).
+   - [ ] Table renders with one row per criterion.
+   - [ ] Rows with `match: false` show ❌; the rest show ✅.
+   - [ ] On disk: `image_matcher/input/UI_Test_01_sim.png` and `UI_Test_01_real.png` were saved.
+   - [ ] On disk: `image_matcher/output/UI_Test_01/compare.json` exists.
+   - [ ] Re-clicking "Analizează" without changing inputs returns instantly (cache hit, no second LLM call).
+9. Stop the server with Ctrl+C. Optionally delete `image_matcher/input/UI_Test_01_*` and `image_matcher/output/UI_Test_01/` after the test.
+
+If the API key is missing, the UI shows a clear error and stops — no traceback.
+
+- [ ] **Step 5: Update `image_matcher/README.md`**
+
+Append a new section after the existing "Run" section:
+
+```markdown
+
+## Run UI
+
+From project root, with `ANTHROPIC_API_KEY` set:
+
+```
+streamlit run image_matcher/app.py
+```
+
+The browser opens at `http://localhost:8501`. Pick a pair from the dropdown,
+press "Analizează", get the comparison table in the page.
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add requirements.txt image_matcher/app.py image_matcher/theme.css image_matcher/README.md
+git commit -m "feat(image_matcher): add Streamlit UI with editorial theme"
+```
+
+---
+
 ## Done criteria
 
 - All 11 tasks completed and committed.
 - `python -m pytest image_matcher/tests/ -v` passes locally.
 - Manual checklist all green on one real pair.
 - Branch is whichever you're working on (master or feat/mvp-implementation); no merge to remote until you decide.
+
+---
+
+## Done criteria (UI, Task 12)
+
+- `streamlit run image_matcher/app.py` opens a page with: base-name input, two upload widgets, disabled "Analizează" button.
+- Typing an invalid base name shows a clear warning; uploading anything other than `png/jpg/jpeg/webp` is rejected by the widget.
+- With a valid base name and both files uploaded, the button enables and clicking it: saves the files to `image_matcher/input/<base>_sim.<ext>` + `<base>_real.<ext>`, calls `process_pair`, then renders three metrics and a table with one row per criterion.
+- Re-clicking with the same inputs is instant (cache hit, no second LLM call).
+- Missing `ANTHROPIC_API_KEY` produces a clean error in the UI, not a traceback.
+- **Theme applied**: ivory background, Fraunces serif title, Geist body, dashed uploader borders, vermilion hover state on button, layered shadow on metric cards. Visibly distinct from default Streamlit.
+- No change required in `engine.py`, `run.py`, or any test file. CLI workflow (`python -m image_matcher.run`) keeps working unchanged.
 
 ---
 
