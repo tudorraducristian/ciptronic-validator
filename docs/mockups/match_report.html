@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Raport Image Match</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">Match <code>m-4a2b...</code> · Image Match · pas 3/3</span>
+    </div>
+  </header>
+
+  <main class="page page--wide">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 8/8</strong> — Image Match: raport. Ruta: <code>GET /matches/{id}/report</code>.
+      Schemă raport: <code>rows[]</code> cu (criterion, sim_value, real_value, match, match_type, confidence, note).
+      Summary recalculat din rows (vezi <code>parse_compare_response</code>).
+    </div>
+
+    <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: var(--s-3); margin-bottom: var(--s-3);">
+      <h1 style="margin: 0;">Raport comparație</h1>
+      <span class="muted" style="font-size: 14px;">Generat la 19 mai 2026, 16:08 · 12.7 s</span>
+    </div>
+    <p style="margin-bottom: var(--s-6);">
+      Mockup: <code>Tricou_05_sim.png</code> · Real: <code>Tricou_05_real.jpg</code>.
+      7 criterii din mockup + 1 element extra detectat pe produsul real.
+    </p>
+
+    <div class="image-pair">
+      <div class="image-pair__col">
+        <h3>Mockup (sim)</h3>
+        <div class="image-pair__thumb" aria-label="Mockup tricou navy">
+          tricou navy · mockup
+        </div>
+      </div>
+      <div class="image-pair__col">
+        <h3>Produs real</h3>
+        <div class="image-pair__thumb image-pair__thumb--real" aria-label="Fotografie tricou real">
+          tricou navy · real
+        </div>
+      </div>
+    </div>
+
+    <div class="match-summary">
+      <div class="match-summary__chip">
+        <div class="match-summary__chip__label">Total criterii</div>
+        <div class="match-summary__chip__value">8</div>
+      </div>
+      <div class="match-summary__chip match-summary__chip--match">
+        <div class="match-summary__chip__label">Match</div>
+        <div class="match-summary__chip__value">5</div>
+      </div>
+      <div class="match-summary__chip match-summary__chip--mismatch">
+        <div class="match-summary__chip__label">Mismatch</div>
+        <div class="match-summary__chip__value">2</div>
+      </div>
+      <div class="match-summary__chip">
+        <div class="match-summary__chip__label">Extra pe real</div>
+        <div class="match-summary__chip__value">1</div>
+      </div>
+    </div>
+
+    <div class="match-table-wrap">
+      <table class="match-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;"></th>
+            <th>Criteriu</th>
+            <th>Sim (mockup)</th>
+            <th>Real (produs)</th>
+            <th style="width: 110px;">Tip</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="is-match">
+            <td><span class="match-table__icon match-table__icon--ok" aria-label="match">✓</span></td>
+            <td>
+              <div class="match-table__criterion">Color principal</div>
+              <div class="match-table__note">confidence: ridicat</div>
+            </td>
+            <td class="match-table__value">albastru navy uniform</td>
+            <td class="match-table__value">albastru navy uniform</td>
+            <td><span class="badge badge--success">exact</span></td>
+          </tr>
+
+          <tr class="is-mismatch">
+            <td><span class="match-table__icon match-table__icon--bad" aria-label="mismatch">✗</span></td>
+            <td>
+              <div class="match-table__criterion">Croială</div>
+              <div class="match-table__note">tricoul real e fotografiat pe umeraș — dovezi indirecte</div>
+            </td>
+            <td class="match-table__value">slim, tăietură dreaptă</td>
+            <td class="match-table__value">regular, linia laterală nu se mulează</td>
+            <td><span class="badge badge--danger">partial</span></td>
+          </tr>
+
+          <tr class="is-match">
+            <td><span class="match-table__icon match-table__icon--ok" aria-label="match">✓</span></td>
+            <td>
+              <div class="match-table__criterion">Guler</div>
+              <div class="match-table__note">confidence: ridicat</div>
+            </td>
+            <td class="match-table__value">rotund clasic ~2 cm</td>
+            <td class="match-table__value">rotund clasic, lățime comparabilă</td>
+            <td><span class="badge badge--success">exact</span></td>
+          </tr>
+
+          <tr class="is-match">
+            <td><span class="match-table__icon match-table__icon--ok" aria-label="match">✓</span></td>
+            <td>
+              <div class="match-table__criterion">Mâneci</div>
+              <div class="match-table__note">confidence: ridicat</div>
+            </td>
+            <td class="match-table__value">scurte, tivite deasupra cotului</td>
+            <td class="match-table__value">scurte (~22 cm de la umăr)</td>
+            <td><span class="badge badge--success">exact</span></td>
+          </tr>
+
+          <tr class="is-match">
+            <td><span class="match-table__icon match-table__icon--ok" aria-label="match">✓</span></td>
+            <td>
+              <div class="match-table__criterion">Logo — poziție</div>
+              <div class="match-table__note">confidence: ridicat</div>
+            </td>
+            <td class="match-table__value">piept stâng, ~8 cm sub claviculă</td>
+            <td class="match-table__value">piept stâng, perspectiva purtătorului</td>
+            <td><span class="badge badge--success">exact</span></td>
+          </tr>
+
+          <tr class="is-match">
+            <td><span class="match-table__icon match-table__icon--ok" aria-label="match">✓</span></td>
+            <td>
+              <div class="match-table__criterion">Logo — culori</div>
+              <div class="match-table__note">confidence: mediu — al doilea ton apare maroniu din cauza expunerii</div>
+            </td>
+            <td class="match-table__value">alb + roșu vibrant</td>
+            <td class="match-table__value">alb + roșu (saturație mai redusă)</td>
+            <td><span class="badge badge--success">exact</span></td>
+          </tr>
+
+          <tr class="is-mismatch">
+            <td><span class="match-table__icon match-table__icon--bad" aria-label="mismatch">✗</span></td>
+            <td>
+              <div class="match-table__criterion">Logo — dimensiune</div>
+              <div class="match-table__note">raportat la lățimea umărului (~45 cm) în poza reală</div>
+            </td>
+            <td class="match-table__value">~10 × 10 cm</td>
+            <td class="match-table__value">~7 × 7 cm</td>
+            <td><span class="badge badge--danger">partial</span></td>
+          </tr>
+
+          <tr class="is-extra">
+            <td><span class="match-table__icon match-table__icon--extra" aria-label="extra">+</span></td>
+            <td>
+              <div class="match-table__criterion">Etichetă brand pe guler</div>
+              <div class="match-table__note">element prezent pe real, nedetectat în mockup — apare în poza 1, sub guler</div>
+            </td>
+            <td class="match-table__value muted">—</td>
+            <td class="match-table__value">etichetă țesută „CIPTRONIC”, ~3 × 1 cm</td>
+            <td><span class="badge badge--warn">extra</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="row-actions" style="margin-top: var(--s-6);">
+      <a href="match_wait.html" class="btn btn--ghost">
+        <span aria-hidden="true">←</span>
+        Înlocuiește poza reală
+      </a>
+      <a href="index.html" class="btn btn--secondary">
+        Începe o nouă validare
+      </a>
+    </div>
+
+    <p class="muted" style="font-size: 13px; margin-top: var(--s-4);">
+      <strong>Tip-uri match:</strong>
+      <span class="badge badge--success">exact</span> — criteriul se potrivește exact ·
+      <span class="badge badge--danger">partial</span> — criteriul se potrivește parțial sau diferă substanțial ·
+      <span class="badge badge--warn">extra</span> — element prezent pe real care nu apare în mockup ·
+      <span class="badge badge--neutral">missing</span> — criteriu din mockup nedetectabil pe real (lipsește din raportul de mai sus dacă nu e cazul).
+    </p>
+  </main>
+</body>
+</html>

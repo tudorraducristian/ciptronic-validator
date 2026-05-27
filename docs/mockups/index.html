@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ciptronic Validator — Începe o specificare</title>
+  <title>Ciptronic Validator — Alege fluxul</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -13,62 +13,67 @@
         <span class="brand__mark">C</span>
         Ciptronic Validator
       </a>
-      <span class="topbar__meta">v0.1 · MVP local</span>
+      <span class="topbar__meta">v0.2 · MVP local</span>
     </div>
   </header>
 
   <main class="page page--narrow">
     <div class="state-banner">
-      <strong>Mockup · Pagina 1/4</strong> — Landing. Ruta: <code>GET /</code>. Formularul trimite la <code>POST /sessions</code>.
+      <strong>Mockup · Pagina 1/8</strong> — Landing. Ruta: <code>GET /</code>. Userul alege înainte de orice altceva între fluxul text și fluxul imagine.
     </div>
 
-    <h1>Începe o specificare nouă</h1>
+    <h1>Validare produs personalizat</h1>
     <p>
-      Descrie pe scurt produsul comandat de client. Asistentul îți pune întrebări țintite
-      (maximum 5 runde) și completează specificația tehnică. La final, validezi cu poze.
+      Alege felul în care vrei să specifici produsul. Ambele rute duc la un raport de
+      validare, dar pleacă de la inputuri diferite și produc rapoarte diferite.
     </p>
 
-    <form class="card" action="/sessions" method="post"
-          onsubmit="event.preventDefault(); window.location.href='session.html';">
-      <div class="field">
-        <label class="field__label" for="product_type">Tip produs</label>
-        <select class="select" id="product_type" name="product_type">
-          <option value="tricou" selected>Tricou</option>
-          <option value="sapca" disabled>Șapcă (în curând)</option>
-          <option value="hanorac" disabled>Hanorac (în curând)</option>
-        </select>
-        <span class="field__hint">Alege tipul; schema specifică va ghida întrebările.</span>
-      </div>
+    <div class="choice-grid">
+      <a class="choice-card" href="session_new.html">
+        <span class="choice-card__glyph">Aa</span>
+        <h2 class="choice-card__title">Am o descriere</h2>
+        <p class="choice-card__desc">
+          Pornești de la o descriere în cuvinte („o bluză navy cu logo pe piept stâng”).
+          Asistentul îți pune întrebări țintite (max 5 runde) și completează un checklist
+          structurat. La final, validează produsul finit pe poze cu un raport
+          <strong>Conform / Neconform / Nevizibil</strong>.
+        </p>
+        <div class="choice-card__meta">
+          <span>Discovery → Inspector</span>
+          <span>·</span>
+          <span>schemă fixă pe tip produs</span>
+        </div>
+        <span class="choice-card__cta">Începe specificare <span aria-hidden="true">→</span></span>
+      </a>
 
-      <div class="field">
-        <label class="field__label" for="initial_description">Descriere inițială</label>
-        <textarea
-          class="textarea"
-          id="initial_description"
-          name="initial_description"
-          rows="4"
-          placeholder="ex: O bluză cu logo pe piept stâng, culoare navy, mâneci scurte, material bumbac."
-        >O bluză cu logo pe piept stâng, culoare navy, mâneci scurte.</textarea>
-        <span class="field__hint">Folosește limbajul natural al clientului — nu e nevoie să fie completă.</span>
-      </div>
+      <a class="choice-card" href="match_new.html">
+        <span class="choice-card__glyph">▣</span>
+        <h2 class="choice-card__title">Am un mockup</h2>
+        <p class="choice-card__desc">
+          Pornești de la o imagine de referință (artwork-ul aprobat de client). Sistemul
+          extrage automat criteriile vizuale și le compară cu poza produsului finit,
+          criteriu cu criteriu. Raport sub formă de <strong>tabel</strong> cu match-uri și
+          discrepanțe.
+        </p>
+        <div class="choice-card__meta">
+          <span>Image Match</span>
+          <span>·</span>
+          <span>agnostic la tip produs</span>
+        </div>
+        <span class="choice-card__cta">Încarcă mockup <span aria-hidden="true">→</span></span>
+      </a>
+    </div>
 
-      <div class="row-actions">
-        <span class="muted" style="font-size: 13px;">Sesiunea se va salva automat în baza locală.</span>
-        <button type="submit" class="btn btn--primary btn--lg">
-          Începe specificare
-          <span aria-hidden="true">→</span>
-        </button>
-      </div>
-    </form>
-
-    <div class="divider-label">Cum funcționează</div>
-
+    <div class="divider-label">Cum aleg?</div>
     <div class="card">
-      <ol style="margin: 0; padding-left: 20px; line-height: 1.8; color: var(--c-text-muted); font-size: 14px;">
-        <li><strong>Discovery</strong> — răspunzi la întrebări grupate până specificația e completă (max 5 runde).</li>
-        <li><strong>Upload</strong> — încarci 1–4 poze ale produsului finit.</li>
-        <li><strong>Inspector</strong> — primești un raport cu trei zone: conform, neconform și nevizibil.</li>
-      </ol>
+      <dl style="margin: 0; display: grid; grid-template-columns: 200px 1fr; gap: var(--s-2) var(--s-4); font-size: 14px;">
+        <dt class="muted">Ai doar text / mail client</dt>
+        <dd>→ <strong>Am o descriere</strong></dd>
+        <dt class="muted">Ai artwork aprobat (PNG / JPG)</dt>
+        <dd>→ <strong>Am un mockup</strong></dd>
+        <dt class="muted">Ai și una, și alta</dt>
+        <dd>Folosește pe rând câte una, nu există flux hibrid în MVP.</dd>
+      </dl>
     </div>
   </main>
 </body>

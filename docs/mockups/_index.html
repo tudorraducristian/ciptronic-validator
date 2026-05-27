@@ -13,44 +13,67 @@
         <span class="brand__mark">C</span>
         Ciptronic Validator — Mockup-uri
       </a>
-      <span class="topbar__meta">Pre-implementare · validare flow</span>
+      <span class="topbar__meta">v0.2 · două fluxuri</span>
     </div>
   </header>
 
   <main class="page page--narrow">
     <h1>Validare flow funcțional</h1>
     <p>
-      Cele 4 pagini ale aplicației, randate cu date realiste pentru un tricou navy cu logo
-      serigrafiat. Toate sunt statice — nu rulează backend. Navighează în ordinea de mai jos
-      pentru a urmări fluxul end-to-end.
+      8 pagini, organizate în 2 fluxuri paralele. Userul alege la landing între fluxul
+      <strong>text</strong> (Discovery + Inspector) și fluxul <strong>imagine</strong>
+      (Image Match). Mockup-urile sunt statice, dar descrierea pe care o tastezi la
+      pasul 2 se propagă în paginile următoare prin <code>sessionStorage</code>.
     </p>
 
-    <ol style="list-style: none; padding: 0; counter-reset: step; margin: var(--s-5) 0;">
-      <li class="card" style="margin-bottom: var(--s-3); counter-increment: step; position: relative;">
+    <!-- Shared entry -->
+    <div class="divider-label">Intrare comună</div>
+    <div class="card" style="margin-bottom: var(--s-5);">
+      <div style="display: flex; align-items: start; gap: var(--s-4);">
+        <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">1</div>
+        <div style="flex: 1;">
+          <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+            <a href="index.html">Landing — Alege fluxul</a>
+          </h2>
+          <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+            Două cards mari: „Am o descriere” și „Am un mockup”. Decizia se ia înainte de orice.
+          </p>
+          <span class="badge badge--neutral">GET /</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flow A: text -->
+    <div class="divider-label">Flux A — descriere (Discovery + Inspector)</div>
+
+    <ol style="list-style: none; padding: 0; margin: 0 0 var(--s-5);">
+      <li class="card" style="margin-bottom: var(--s-3);">
         <div style="display: flex; align-items: start; gap: var(--s-4);">
-          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">1</div>
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">2</div>
           <div style="flex: 1;">
             <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
-              <a href="index.html">Landing — Începe specificare</a>
+              <a href="session_new.html">Formular descriere inițială</a>
             </h2>
             <p style="margin: 0 0 var(--s-2); font-size: 14px;">
-              Userul alege tipul de produs și scrie o descriere inițială.
+              Dropdown tip produs + textarea descriere. La submit, salvează în
+              <code>sessionStorage</code> și se propagă în paginile următoare.
             </p>
-            <span class="badge badge--neutral">GET /</span>
+            <span class="badge badge--neutral">GET /sessions/new</span>
             <span class="badge badge--neutral">POST /sessions</span>
           </div>
         </div>
       </li>
 
-      <li class="card" style="margin-bottom: var(--s-3); counter-increment: step;">
+      <li class="card" style="margin-bottom: var(--s-3);">
         <div style="display: flex; align-items: start; gap: var(--s-4);">
-          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">2</div>
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">3</div>
           <div style="flex: 1;">
             <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
               <a href="session.html">Discovery — Întrebări iterative</a>
             </h2>
             <p style="margin: 0 0 var(--s-2); font-size: 14px;">
-              Checklist read-only (stânga) + max 4 întrebări pe rundă (dreapta). Conține și starea „done”.
+              Checklist read-only + max 4 întrebări pe rundă. Două stări: în-progres și done=true.
+              Afișează descrierea pe care ai tastat-o la pasul 2.
             </p>
             <span class="badge badge--neutral">GET /sessions/&#123;id&#125;</span>
             <span class="badge badge--neutral">POST /sessions/&#123;id&#125;/answer</span>
@@ -58,9 +81,9 @@
         </div>
       </li>
 
-      <li class="card" style="margin-bottom: var(--s-3); counter-increment: step;">
+      <li class="card" style="margin-bottom: var(--s-3);">
         <div style="display: flex; align-items: start; gap: var(--s-4);">
-          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">3</div>
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">4</div>
           <div style="flex: 1;">
             <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
               <a href="validate.html">Upload — 1–4 poze</a>
@@ -74,17 +97,70 @@
         </div>
       </li>
 
-      <li class="card" style="counter-increment: step;">
+      <li class="card">
         <div style="display: flex; align-items: start; gap: var(--s-4);">
-          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-info); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">4</div>
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--c-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">5</div>
           <div style="flex: 1;">
             <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
               <a href="report.html">Raport — Conform / Neconform / Nevizibil</a>
             </h2>
             <p style="margin: 0 0 var(--s-2); font-size: 14px;">
-              Trei zone vizuale distincte, fiecare câmp-frunză al schemei apare exact o dată.
+              Trei zone vizuale distincte. Fiecare câmp-frunză al schemei apare exact o dată.
             </p>
             <span class="badge badge--neutral">GET /reports/&#123;id&#125;</span>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <!-- Flow B: image -->
+    <div class="divider-label">Flux B — mockup (Image Match)</div>
+
+    <ol style="list-style: none; padding: 0; margin: 0;">
+      <li class="card" style="margin-bottom: var(--s-3);">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: #1E40AF; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">6</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="match_new.html">Match — Upload mockup</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Un singur slot pentru artwork. Două stări: gol și completat.
+            </p>
+            <span class="badge badge--neutral">GET /matches/new</span>
+            <span class="badge badge--neutral">POST /matches</span>
+          </div>
+        </div>
+      </li>
+
+      <li class="card" style="margin-bottom: var(--s-3);">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: #1E40AF; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">7</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="match_wait.html">Match — Criterii extrase + upload real</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Listă criterii detectate de <code>analyze_sim</code> + slot pentru poza produsului real.
+              Status DB: <code>awaiting_real</code>.
+            </p>
+            <span class="badge badge--neutral">GET /matches/&#123;id&#125;</span>
+            <span class="badge badge--neutral">POST /matches/&#123;id&#125;/real</span>
+          </div>
+        </div>
+      </li>
+
+      <li class="card">
+        <div style="display: flex; align-items: start; gap: var(--s-4);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: #1E40AF; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--ff-sans);">8</div>
+          <div style="flex: 1;">
+            <h2 style="margin: 0 0 var(--s-2); font-family: var(--ff-sans); font-size: 17px;">
+              <a href="match_report.html">Match — Raport tabelar</a>
+            </h2>
+            <p style="margin: 0 0 var(--s-2); font-size: 14px;">
+              Image pair preview + summary chips + tabel rows. Tipuri match: exact, partial, missing, extra.
+            </p>
+            <span class="badge badge--neutral">GET /matches/&#123;id&#125;/report</span>
           </div>
         </div>
       </li>
@@ -93,18 +169,20 @@
     <div class="divider-label">Sistem de design folosit</div>
     <div class="card">
       <dl style="margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: var(--s-2) var(--s-4); font-size: 14px;">
-        <dt class="muted">Pattern</dt><dd>Minimal Single Column</dd>
-        <dt class="muted">Stil</dt><dd>Flat Design (fără shadows, fără gradienturi)</dd>
+        <dt class="muted">Pattern</dt><dd>Minimal Single Column · two-flow chooser la entry</dd>
+        <dt class="muted">Stil</dt><dd>Flat Design (fără shadows, fără gradienturi UI — gradienturi doar pe thumb-uri de imagini)</dd>
         <dt class="muted">Mod</dt><dd>Light, optimizat WCAG AA</dd>
         <dt class="muted">Fonturi</dt><dd>Lora (serif headings) + Inter (sans body)</dd>
-        <dt class="muted">Accent</dt><dd>verde #16A34A pentru CTA principal</dd>
+        <dt class="muted">Accent</dt><dd>verde <code>#16A34A</code> pentru CTA principal · albastru <code>#1E40AF</code> pentru flux imagine</dd>
         <dt class="muted">Limbă</dt><dd>română, cu diacritice</dd>
-        <dt class="muted">Framework JS</dt><dd>niciunul (HTMX la nivel de atribut)</dd>
+        <dt class="muted">Framework JS</dt><dd>niciunul (HTMX la nivel de atribut pe flux text)</dd>
       </dl>
     </div>
 
     <p class="muted" style="font-size: 13px; margin-top: var(--s-5);">
-      Banner-ele galbene din partea de sus a fiecărei pagini marchează metadata mockup-ului (rute, stări). În implementarea reală nu apar.
+      Banner-ele galbene din partea de sus a fiecărei pagini marchează metadata mockup-ului (rute, stări).
+      În implementarea reală nu apar. Cele două fluxuri salvează în tabele DB separate
+      (<code>validation_reports</code> și <code>match_sessions</code>) și nu se ating.
     </p>
   </main>
 </body>

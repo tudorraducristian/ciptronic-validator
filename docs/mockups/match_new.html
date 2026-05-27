@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Încarcă mockup</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">Image Match · pas 1/3</span>
+    </div>
+  </header>
+
+  <main class="page page--narrow">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 6/8</strong> — Image Match: încărcare mockup.
+      Rute: <code>GET /matches/new</code> (form) și <code>POST /matches</code> (upload mockup, creează sesiune).
+    </div>
+
+    <h1>Încarcă mockup-ul produsului</h1>
+    <p>
+      Sistemul va extrage automat criteriile vizuale din artwork (culori, logo,
+      poziție, dimensiuni) și le va folosi mai târziu pentru a compara cu poza
+      produsului real. Mockup-ul rămâne sursa de adevăr — nu trebuie să descrii nimic
+      în cuvinte.
+    </p>
+
+    <div class="callout" style="margin-bottom: var(--s-5);">
+      <strong>Acceptăm:</strong> JPG, PNG, WEBP · max <strong>5 MB</strong>. Recomandare:
+      mockup curat, fundal neutru, fără mock-up texturat sau efecte 3D.
+    </div>
+
+    <!-- ============== STATE A: empty upload zone ============== -->
+    <div class="divider-label">Stare A — slot gol</div>
+
+    <form action="/matches" method="post" enctype="multipart/form-data"
+          onsubmit="event.preventDefault(); window.location.href='match_wait.html';">
+      <div class="single-upload">
+        <span class="single-upload__glyph">▣</span>
+        <p class="single-upload__title">Trage mockup-ul aici</p>
+        <p class="single-upload__hint">sau apasă pentru a alege un fișier din computer</p>
+        <input type="file" name="sim" accept="image/*" hidden />
+      </div>
+
+      <div class="row-actions">
+        <a href="index.html" class="btn btn--ghost">
+          <span aria-hidden="true">←</span>
+          Înapoi la alegere flux
+        </a>
+        <button type="submit" class="btn btn--primary btn--lg" disabled>
+          Continuă cu mockup-ul
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </form>
+
+    <!-- ============== STATE B: filled (preview after selecting a file) ============== -->
+    <div class="divider-label">Stare B — fișier ales</div>
+
+    <form action="/matches" method="post" enctype="multipart/form-data"
+          onsubmit="event.preventDefault(); window.location.href='match_wait.html';">
+      <div class="single-upload single-upload--filled">
+        <div class="single-upload__thumb" aria-label="Preview mockup ales">
+          tricou navy · mockup
+        </div>
+        <div class="single-upload__meta">
+          <p class="single-upload__title">Tricou_05_sim.png</p>
+          <p class="single-upload__filename">1.4 MB · 1200 × 1200 · PNG</p>
+          <p class="single-upload__hint" style="margin-top: var(--s-2);">
+            Apasă pe imagine pentru a alege un alt fișier.
+          </p>
+        </div>
+        <input type="file" name="sim" accept="image/*" hidden />
+      </div>
+
+      <div class="row-actions">
+        <a href="index.html" class="btn btn--ghost">
+          <span aria-hidden="true">←</span>
+          Înapoi la alegere flux
+        </a>
+        <button type="submit" class="btn btn--primary btn--lg">
+          Continuă cu mockup-ul
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </form>
+
+    <p class="muted" style="font-size: 13px; margin-top: var(--s-5); text-align: center;">
+      Pasul următor: sistemul analizează mockup-ul cu Claude Sonnet 4.6 vision (5–10 s)
+      și îți arată criteriile extrase, înainte să încarci poza produsului real.
+    </p>
+  </main>
+</body>
+</html>

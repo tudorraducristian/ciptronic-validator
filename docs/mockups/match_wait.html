@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ciptronic Validator — Criterii detectate</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="_index.html">
+        <span class="brand__mark">C</span>
+        Ciptronic Validator
+      </a>
+      <span class="topbar__meta">Match <code>m-4a2b...</code> · Image Match · pas 2/3</span>
+    </div>
+  </header>
+
+  <main class="page page--wide">
+    <div class="state-banner">
+      <strong>Mockup · Pagina 7/8</strong> — Image Match: criterii extrase, așteaptă produsul real.
+      Rute: <code>GET /matches/{id}</code> (vede criterii) și <code>POST /matches/{id}/real</code> (upload real → comparație).
+      Status DB: <code>awaiting_real</code>.
+    </div>
+
+    <h1>Criterii detectate în mockup</h1>
+    <p style="margin-bottom: var(--s-5);">
+      Sistemul a analizat artwork-ul și a extras <strong>7 criterii vizuale</strong>.
+      Acestea sunt aspectele pe care le va verifica pe poza produsului real, criteriu cu
+      criteriu. Dacă produsul real e gata, încarcă-l mai jos.
+    </p>
+
+    <div class="discovery">
+      <!-- LEFT: sim preview + extracted criteria -->
+      <aside class="card">
+        <h2 class="card__title">Mockup analizat</h2>
+
+        <div class="image-pair" style="grid-template-columns: 1fr; margin-bottom: var(--s-4);">
+          <div class="image-pair__col">
+            <div class="image-pair__thumb" aria-label="Mockup tricou navy">
+              tricou navy · mockup
+            </div>
+          </div>
+        </div>
+
+        <p class="muted" style="font-size: 13px; margin: 0 0 var(--s-3);">
+          <code>Tricou_05_sim.png</code> · analizat în 6.4 s
+        </p>
+
+        <h2 class="card__title">Criterii extrase</h2>
+        <ol class="criteria-list">
+          <li>
+            <span class="criteria-list__num">1</span>
+            <div>
+              <span class="criteria-list__label">Color principal</span>
+              <span class="criteria-list__desc">Albastru navy uniform pe tot corpul, fără gradienturi.</span>
+            </div>
+          </li>
+          <li>
+            <span class="criteria-list__num">2</span>
+            <div>
+              <span class="criteria-list__label">Croială</span>
+              <span class="criteria-list__desc">Tăietură dreaptă, slim, fără pliuri laterale vizibile.</span>
+            </div>
+          </li>
+          <li>
+            <span class="criteria-list__num">3</span>
+            <div>
+              <span class="criteria-list__label">Guler</span>
+              <span class="criteria-list__desc">Rotund clasic, lățime cca 2 cm.</span>
+            </div>
+          </li>
+          <li>
+            <span class="criteria-list__num">4</span>
+            <div>
+              <span class="criteria-list__label">Mâneci</span>
+              <span class="criteria-list__desc">Scurte, terminație tivită deasupra cotului.</span>
+            </div>
+          </li>
+          <li>
+            <span class="criteria-list__num">5</span>
+            <div>
+              <span class="criteria-list__label">Logo — poziție</span>
+              <span class="criteria-list__desc">Piept stâng, cca 8 cm sub clavicula stângă.</span>
+            </div>
+          </li>
+          <li>
+            <span class="criteria-list__num">6</span>
+            <div>
+              <span class="criteria-list__label">Logo — culori</span>
+              <span class="criteria-list__desc">Două culori: alb + roșu vibrant.</span>
+            </div>
+          </li>
+          <li>
+            <span class="criteria-list__num">7</span>
+            <div>
+              <span class="criteria-list__label">Logo — dimensiune</span>
+              <span class="criteria-list__desc">Aproximativ 10 × 10 cm (estimat raportat la lățimea umărului).</span>
+            </div>
+          </li>
+        </ol>
+      </aside>
+
+      <!-- RIGHT: upload real photo -->
+      <section class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-4); flex-wrap: wrap; gap: var(--s-3);">
+          <h2 style="margin: 0; font-family: var(--ff-sans); font-size: 18px;">Adaugă poza produsului real</h2>
+          <span class="badge badge--info">await real</span>
+        </div>
+
+        <p>
+          O singură poză, frontală, cu produsul finit. Sistemul va compara criteriu cu
+          criteriu față de mockup și va produce un raport tabelar.
+        </p>
+
+        <div class="callout" style="margin-bottom: var(--s-4);">
+          <strong>Recomandare:</strong> fundal neutru, lumină difuză, produsul plat sau pe manechin.
+          Evită umeraș dacă vrei să poți judeca croiala.
+        </div>
+
+        <form action="/matches/m-4a2b/real" method="post" enctype="multipart/form-data"
+              onsubmit="event.preventDefault(); window.location.href='match_report.html';">
+
+          <!-- ============== STATE A: empty ============== -->
+          <div class="divider-label" style="margin-top: 0;">Stare A — slot gol</div>
+          <div class="single-upload" style="margin-bottom: var(--s-4);">
+            <span class="single-upload__glyph">▤</span>
+            <p class="single-upload__title">Trage poza produsului real aici</p>
+            <p class="single-upload__hint">sau apasă pentru a alege un fișier</p>
+            <input type="file" name="real" accept="image/*" hidden />
+          </div>
+
+          <!-- ============== STATE B: filled ============== -->
+          <div class="divider-label">Stare B — fișier ales</div>
+          <div class="single-upload single-upload--filled" style="margin-bottom: var(--s-4);">
+            <div class="single-upload__thumb" aria-label="Preview poză produs real">
+              tricou navy · real
+            </div>
+            <div class="single-upload__meta">
+              <p class="single-upload__title">Tricou_05_real.jpg</p>
+              <p class="single-upload__filename">2.1 MB · 1800 × 2400 · JPG</p>
+              <p class="single-upload__hint" style="margin-top: var(--s-2);">
+                Apasă pe imagine pentru a alege un alt fișier.
+              </p>
+            </div>
+            <input type="file" name="real" accept="image/*" hidden />
+          </div>
+
+          <div class="row-actions">
+            <a href="match_new.html" class="btn btn--ghost">
+              <span aria-hidden="true">←</span>
+              Schimbă mockup-ul
+            </a>
+            <button type="submit" class="btn btn--primary btn--lg">
+              Compară cu mockup-ul
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </form>
+
+        <p class="muted" style="font-size: 13px; margin-top: var(--s-5);">
+          Comparația rulează <code>image_matcher.engine.compare_real()</code> — un singur apel
+          Claude Sonnet 4.6 vision (8–15 s) cu <code>max_tokens=8192</code>.
+        </p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
