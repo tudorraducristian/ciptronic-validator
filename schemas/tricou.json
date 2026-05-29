@@ -1,0 +1,30 @@
+{
+  "id": "tricou",
+  "name_ro": "Tricou",
+  "fields": [
+    { "key": "culoare_principala", "label": "Culoare principală",
+      "hint": "ex: roșu, negru, alb melange" },
+    { "key": "material", "label": "Material",
+      "hint": "ex: bumbac 100%, poliester, mix" },
+    { "key": "croiala", "label": "Croială",
+      "hint": "regular / slim / oversize" },
+    { "key": "guler", "label": "Tip guler",
+      "hint": "rotund / V / polo" },
+    { "key": "maneci", "label": "Mâneci",
+      "hint": "scurte / lungi / 3/4" },
+    {
+      "key": "branding", "label": "Branding (logo/print/imprimeu)",
+      "type": "object",
+      "allow_none_value": "fără branding",
+      "subfields": [
+        { "key": "pozitie", "label": "Poziție",
+          "hint": "ex: piept stâng, spate centru" },
+        { "key": "tehnica", "label": "Tehnică",
+          "hint": "serigrafie / broderie / DTF / sublimare" },
+        { "key": "culori", "label": "Culori", "type": "list" },
+        { "key": "dimensiuni_aproximative", "label": "Dimensiuni aproximative",
+          "hint": "ex: 10cm x 10cm" }
+      ]
+    }
+  ]
+}
