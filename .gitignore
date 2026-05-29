@@ -1,10 +1,37 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
 .pytest_cache/
+.coverage
+
+# venv
+.venv/
+
+# Environment
+.env
+
+# Runtime
+uploads/
+*.db
+*.sqlite
+*.sqlite3
 
 # image_matcher local artifacts
-image_matcher/.env
 image_matcher/input/*
 !image_matcher/input/.gitkeep
 image_matcher/output/
+
+# Test fixtures
+tests/fixtures/images/*.jpg
+tests/fixtures/images/*.jpeg
+tests/fixtures/images/*.png
+!tests/fixtures/images/README.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
