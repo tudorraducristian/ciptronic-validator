@@ -1,0 +1,33 @@
+{
+  "conform": [
+    { "camp": "culoare_principala", "valoare_asteptata": "albastru navy",
+      "valoare_observata": "albastru navy", "incredere": "ridicat",
+      "motiv": "culoarea e clar vizibilă în pozele 1 și 2" },
+    { "camp": "croiala", "valoare_asteptata": "slim",
+      "valoare_observata": "slim", "incredere": "ridicat",
+      "motiv": "fitting strâns vizibil în poza 1" },
+    { "camp": "guler", "valoare_asteptata": "rotund",
+      "valoare_observata": "rotund", "incredere": "ridicat",
+      "motiv": "guler rotund clasic în poza 1" },
+    { "camp": "maneci", "valoare_asteptata": "scurte",
+      "valoare_observata": "scurte", "incredere": "ridicat",
+      "motiv": "mâneci scurte clar vizibile" },
+    { "camp": "branding.pozitie", "valoare_asteptata": "piept stâng",
+      "valoare_observata": "piept stâng", "incredere": "ridicat",
+      "motiv": "logo pe piept stâng, poza 1" },
+    { "camp": "branding.culori", "valoare_asteptata": ["alb"],
+      "valoare_observata": "alb", "incredere": "ridicat",
+      "motiv": "logo alb pe fond navy" }
+  ],
+  "neconform": [
+    { "camp": "branding.tehnica", "valoare_asteptata": "serigrafie",
+      "valoare_observata": "pare DTF", "incredere": "mediu",
+      "motiv": "în poza 3 logo-ul are textură ridicată caracteristică DTF" }
+  ],
+  "nevizibil": [
+    { "camp": "material", "valoare_asteptata": "bumbac 100%",
+      "motiv": "țesătura nu apare în closeup în niciuna dintre poze" },
+    { "camp": "branding.dimensiuni_aproximative", "valoare_asteptata": "10cm x 10cm",
+      "motiv": "nicio referință de scară în poze" }
+  ]
+}

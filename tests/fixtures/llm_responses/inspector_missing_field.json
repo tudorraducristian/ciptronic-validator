@@ -1,0 +1,22 @@
+{
+  "conform": [
+    { "camp": "culoare_principala", "valoare_asteptata": "navy",
+      "valoare_observata": "navy", "incredere": "ridicat", "motiv": "vizibil" },
+    { "camp": "croiala", "valoare_asteptata": "slim",
+      "valoare_observata": "slim", "incredere": "ridicat", "motiv": "vizibil" },
+    { "camp": "guler", "valoare_asteptata": "rotund",
+      "valoare_observata": "rotund", "incredere": "ridicat", "motiv": "vizibil" },
+    { "camp": "maneci", "valoare_asteptata": "scurte",
+      "valoare_observata": "scurte", "incredere": "ridicat", "motiv": "vizibil" },
+    { "camp": "branding.pozitie", "valoare_asteptata": "piept stâng",
+      "valoare_observata": "piept stâng", "incredere": "ridicat", "motiv": "vizibil" }
+  ],
+  "neconform": [],
+  "nevizibil": [
+    { "camp": "branding.tehnica", "valoare_asteptata": "serigrafie",
+      "motiv": "neclară" },
+    { "camp": "branding.culori", "valoare_asteptata": ["alb"], "motiv": "neclară" },
+    { "camp": "branding.dimensiuni_aproximative", "valoare_asteptata": "10cm",
+      "motiv": "neclară" }
+  ]
+}
