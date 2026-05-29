@@ -1,0 +1,19 @@
+{
+  "state": {
+    "culoare_principala": "albastru navy",
+    "material": null, "croiala": null, "guler": null, "maneci": null,
+    "branding": {
+      "pozitie": "piept stâng", "tehnica": null,
+      "culori": [], "dimensiuni_aproximative": null
+    }
+  },
+  "intrebari": [
+    { "id": "material", "text": "Ce material preferi?",
+      "variante": ["bumbac 100%", "bumbac+poliester", "poliester"] },
+    { "id": "croiala", "text": "Ce croială?",
+      "variante": ["regular", "slim", "oversize"] },
+    { "id": "branding.tehnica", "text": "Ce tehnică de aplicare a logo-ului?",
+      "variante": ["serigrafie", "broderie", "DTF", "sublimare"] }
+  ],
+  "done": false
+}

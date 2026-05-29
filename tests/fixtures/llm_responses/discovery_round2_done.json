@@ -1,0 +1,12 @@
+{
+  "state": {
+    "culoare_principala": "albastru navy", "material": "bumbac 100%",
+    "croiala": "slim", "guler": "rotund", "maneci": "scurte",
+    "branding": {
+      "pozitie": "piept stâng", "tehnica": "serigrafie",
+      "culori": ["alb"], "dimensiuni_aproximative": "10cm x 10cm"
+    }
+  },
+  "intrebari": [],
+  "done": true
+}
