@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block topbar_meta %}Raport <code>{{ report_id[:8] }}</code>{% endblock %}
+{% block content %}
+<main class="page page--wide">
+    <h1>Raport validare</h1>
+    <p style="margin-bottom: var(--s-6);">
+        Total câmpuri raportate: {{ (conform|length) + (neconform|length) + (nevizibil|length) }}.
+    </p>
+
+    <section class="report-zone report-zone--conform">
+        <header class="report-zone__header">
+            <span class="report-zone__icon">✓</span>
+            <h2 class="report-zone__title">Conform</h2>
+            <span class="report-zone__count">{{ conform|length }}</span>
+        </header>
+        {% for item in conform %}
+        <article class="report-item">
+            <div class="report-item__head">
+                <span class="report-item__field">{{ item.camp }}</span>
+                <span class="badge badge--success">încredere: {{ item.incredere }}</span>
+            </div>
+            <dl style="margin: 0;">
+                <div class="report-item__row"><dt>Așteptat</dt><dd>{{ item.valoare_asteptata }}</dd></div>
+                <div class="report-item__row"><dt>Observat</dt><dd>{{ item.valoare_observata }}</dd></div>
+            </dl>
+            <p class="report-item__reason">{{ item.motiv }}</p>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="report-zone report-zone--neconform">
+        <header class="report-zone__header">
+            <span class="report-zone__icon">✗</span>
+            <h2 class="report-zone__title">Neconform</h2>
+            <span class="report-zone__count">{{ neconform|length }}</span>
+        </header>
+        {% for item in neconform %}
+        <article class="report-item">
+            <div class="report-item__head">
+                <span class="report-item__field">{{ item.camp }}</span>
+                <span class="badge badge--danger">încredere: {{ item.incredere }}</span>
+            </div>
+            <dl style="margin: 0;">
+                <div class="report-item__row"><dt>Așteptat</dt><dd>{{ item.valoare_asteptata }}</dd></div>
+                <div class="report-item__row"><dt>Observat</dt><dd>{{ item.valoare_observata }}</dd></div>
+            </dl>
+            <p class="report-item__reason">{{ item.motiv }}</p>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="report-zone report-zone--nevizibil">
+        <header class="report-zone__header">
+            <span class="report-zone__icon">?</span>
+            <h2 class="report-zone__title">Nevizibil</h2>
+            <span class="report-zone__count">{{ nevizibil|length }}</span>
+        </header>
+        {% for item in nevizibil %}
+        <article class="report-item">
+            <div class="report-item__head">
+                <span class="report-item__field">{{ item.camp }}</span>
+            </div>
+            <dl style="margin: 0;">
+                <div class="report-item__row"><dt>Așteptat</dt><dd>{{ item.valoare_asteptata }}</dd></div>
+            </dl>
+            <p class="report-item__reason">{{ item.motiv }}</p>
+        </article>
+        {% endfor %}
+    </section>
+
+    <div class="row-actions" style="margin-top: var(--s-6);">
+        <a href="/" class="btn btn--secondary">Începe sesiune nouă</a>
+    </div>
+</main>
+{% endblock %}

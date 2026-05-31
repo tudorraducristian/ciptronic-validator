@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block topbar_meta %}Sesiune <code>{{ session_id[:8] }}</code> · pas 2/3{% endblock %}
+{% block content %}
+<main class="page">
+    <h1>Încarcă pozele produsului</h1>
+    <p>Pentru a verifica vizual fiecare câmp, încarcă minim o poză. Recomandăm 2–4 poze.</p>
+
+    <div class="callout" style="margin-bottom: var(--s-5);">
+        <strong>Restricții:</strong> JPG / PNG / WEBP · max <strong>5 MB</strong> per poză.
+    </div>
+
+    <details class="card" style="margin-bottom: var(--s-4);">
+        <summary><strong>Specificație curentă</strong></summary>
+        <pre style="overflow:auto;">{{ spec_pretty }}</pre>
+    </details>
+
+    <form class="card" action="/sessions/{{ session_id }}/validate" method="post"
+          enctype="multipart/form-data">
+        <h2 class="card__title">Slot-uri de încărcare</h2>
+        <div class="upload-grid">
+            <div class="upload-slot">
+                <div class="upload-slot__label">
+                    <span>Poza 1</span><span class="badge badge--required">obligatoriu</span>
+                </div>
+                <input type="file" name="image1" accept="image/*" required>
+            </div>
+            <div class="upload-slot">
+                <div class="upload-slot__label">
+                    <span>Poza 2</span><span class="badge badge--neutral">opțional</span>
+                </div>
+                <input type="file" name="image2" accept="image/*">
+            </div>
+            <div class="upload-slot">
+                <div class="upload-slot__label">
+                    <span>Poza 3</span><span class="badge badge--neutral">opțional</span>
+                </div>
+                <input type="file" name="image3" accept="image/*">
+            </div>
+            <div class="upload-slot">
+                <div class="upload-slot__label">
+                    <span>Poza 4</span><span class="badge badge--neutral">opțional</span>
+                </div>
+                <input type="file" name="image4" accept="image/*">
+            </div>
+        </div>
+        <div class="row-actions">
+            <a href="/sessions/{{ session_id }}" class="btn btn--ghost">
+                <span aria-hidden="true">←</span> Înapoi la specificare
+            </a>
+            <button type="submit" class="btn btn--primary btn--lg">
+                Rulează validarea <span aria-hidden="true">→</span>
+            </button>
+        </div>
+    </form>
+</main>
+{% endblock %}

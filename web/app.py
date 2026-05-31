@@ -5,12 +5,12 @@ from pathlib import Path
 from contextlib import contextmanager
 from typing import Any
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from agents import discovery
+from agents import discovery, inspector
 from agents.llm_client import LLMClient
 from db import repository
 from schemas import loader
@@ -26,6 +26,7 @@ SCHEMA_PATH = BASE_DIR.parent / "db" / "schema.sql"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_ROUNDS = 5
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 _llm_singleton: Any = None
 
 
@@ -219,3 +220,100 @@ def _field_entry(label: str, value) -> dict:
     filled = value is not None and value != "" and value != []
     display = ", ".join(str(v) for v in value) if isinstance(value, list) else (str(value) if value is not None else "")
     return {"label": label, "filled": filled, "display_value": display}
+
+
+@app.get("/sessions/{session_id}/validate", response_class=HTMLResponse)
+def validate_page(session_id: str, request: Request):
+    with get_conn() as conn:
+        row = repository.get_session(conn, session_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Sesiune inexistentă")
+        if row["status"] != "complete":
+            raise HTTPException(status_code=409, detail="Sesiunea nu e completă încă")
+
+    spec = json.loads(row["state_json"])
+    return TEMPLATES.TemplateResponse(
+        request,
+        "validate.html",
+        {
+            "session_id": session_id,
+            "spec_pretty": json.dumps(spec, ensure_ascii=False, indent=2),
+        },
+    )
+
+
+@app.post("/sessions/{session_id}/validate")
+async def run_validation(
+    session_id: str, request: Request,
+    image1: UploadFile = File(...),
+    image2: UploadFile | None = File(None),
+    image3: UploadFile | None = File(None),
+    image4: UploadFile | None = File(None),
+):
+    with get_conn() as conn:
+        row = repository.get_session(conn, session_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Sesiune inexistentă")
+        if row["status"] != "complete":
+            raise HTTPException(status_code=409, detail="Sesiunea nu e completă încă")
+
+        spec = json.loads(row["state_json"])
+        schema = loader.load_schema(row["product_type"])
+
+        upload_files = [f for f in (image1, image2, image3, image4) if f is not None]
+        session_uploads = UPLOADS_DIR / session_id
+        session_uploads.mkdir(parents=True, exist_ok=True)
+        image_paths: list[str] = []
+        for i, f in enumerate(upload_files, start=1):
+            content = await f.read()
+            if len(content) > MAX_FILE_SIZE_BYTES:
+                raise HTTPException(status_code=413, detail=f"Poza {i} depășește 5MB")
+            ext = ".png" if f.content_type == "image/png" else ".jpg"
+            path = session_uploads / f"img{i}{ext}"
+            path.write_bytes(content)
+            image_paths.append(str(path))
+
+        llm = get_llm_client()
+        system, content_blocks = inspector.build_messages(spec=spec, image_paths=image_paths)
+        raw = llm.complete_vision(system=system, content_blocks=content_blocks)
+        try:
+            report = inspector.parse_report(raw, schema, spec)
+        except ValueError as e:
+            raise HTTPException(status_code=502, detail=f"Răspuns Inspector invalid: {e}")
+
+        rid = repository.save_report(
+            conn, session_id=session_id, spec=spec, image_paths=image_paths,
+            conform=[_item_to_dict(i) for i in report.conform],
+            neconform=[_item_to_dict(i) for i in report.neconform],
+            nevizibil=[_item_to_dict(i) for i in report.nevizibil],
+            raw=raw,
+        )
+
+    return Response(status_code=303, headers={"Location": f"/reports/{rid}"})
+
+
+def _item_to_dict(item) -> dict:
+    return {
+        "camp": item.camp, "valoare_asteptata": item.valoare_asteptata,
+        "valoare_observata": item.valoare_observata,
+        "incredere": item.incredere, "motiv": item.motiv,
+    }
+
+
+@app.get("/reports/{report_id}", response_class=HTMLResponse)
+def view_report(report_id: str, request: Request):
+    with get_conn() as conn:
+        row = repository.get_report(conn, report_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Raport inexistent")
+
+    return TEMPLATES.TemplateResponse(
+        request,
+        "report.html",
+        {
+            "report_id": report_id,
+            "conform": json.loads(row["conform_json"]),
+            "neconform": json.loads(row["neconform_json"]),
+            "nevizibil": json.loads(row["nevizibil_json"]),
+        },
+    )

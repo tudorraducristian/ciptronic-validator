@@ -66,3 +66,58 @@ def test_submit_answers_returns_partial_with_done_when_llm_finishes(client, fake
     assert r.status_code == 200
     assert "Specificare completă" in r.text or "done" in r.text
     assert "Validează cu poze" in r.text
+
+
+import base64
+import io
+
+
+def _tiny_jpeg_bytes() -> bytes:
+    jpeg_b64 = (
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ"
+        "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB/8AAEQgAAQABAwEiAA"
+        "IRAQMRAf/EABQAAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8"
+        "QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAh"
+        "EDEQA/AL+AB//Z"
+    )
+    return base64.b64decode(jpeg_b64)
+
+
+def _complete_session(client, fake_llm) -> str:
+    fake_llm.queue_text((FIXTURES / "discovery_round2_done.json").read_text(encoding="utf-8"))
+    r = client.post(
+        "/sessions",
+        data={"product_type": "tricou", "initial_description": "tricou navy cu logo"},
+    )
+    return r.headers["HX-Redirect"].rsplit("/", 1)[-1]
+
+
+def test_get_validate_page_shows_upload_form(client, fake_llm):
+    sid = _complete_session(client, fake_llm)
+    r = client.get(f"/sessions/{sid}/validate")
+    assert r.status_code == 200
+    assert "image1" in r.text
+
+
+def test_post_validate_runs_inspector_and_redirects_to_report(client, fake_llm):
+    sid = _complete_session(client, fake_llm)
+    fake_llm.queue_vision((FIXTURES / "inspector_full.json").read_text(encoding="utf-8"))
+    files = {"image1": ("front.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    r = client.post(f"/sessions/{sid}/validate", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"].startswith("/reports/")
+
+
+def test_report_view_shows_three_zones(client, fake_llm):
+    sid = _complete_session(client, fake_llm)
+    fake_llm.queue_vision((FIXTURES / "inspector_full.json").read_text(encoding="utf-8"))
+    files = {"image1": ("front.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    r = client.post(f"/sessions/{sid}/validate", files=files, follow_redirects=False)
+    location = r.headers["Location"]
+
+    r = client.get(location)
+    assert r.status_code == 200
+    assert "Conform" in r.text
+    assert "Neconform" in r.text
+    assert "Nevizibil" in r.text
+    assert "albastru navy" in r.text
