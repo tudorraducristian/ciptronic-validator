@@ -108,6 +108,41 @@ def test_post_validate_runs_inspector_and_redirects_to_report(client, fake_llm):
     assert r.headers["Location"].startswith("/reports/")
 
 
+def test_post_validate_ignores_empty_optional_file_slots(client, fake_llm):
+    """Browsers submit untouched optional <input type=file> as empty parts
+    (filename="", no content), not as absent fields. These must be skipped so
+    no empty image block is sent to the vision API. Built as a raw multipart
+    body because TestClient/httpx drops empty-filename parts, unlike a browser."""
+    sid = _complete_session(client, fake_llm)
+    fake_llm.queue_vision((FIXTURES / "inspector_full.json").read_text(encoding="utf-8"))
+
+    boundary = "----testboundary123"
+    jpeg = _tiny_jpeg_bytes()
+    parts = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="image1"; filename="front.jpg"\r\n'
+        "Content-Type: image/jpeg\r\n\r\n"
+    ).encode() + jpeg + (
+        f"\r\n--{boundary}\r\n"
+        'Content-Disposition: form-data; name="image2"; filename=""\r\n'
+        "Content-Type: application/octet-stream\r\n\r\n"
+        "\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    r = client.post(
+        f"/sessions/{sid}/validate",
+        content=parts,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    # exactly one image block reached the LLM; the empty slot was dropped
+    _system, content_blocks = fake_llm.vision_calls[0]
+    image_blocks = [b for b in content_blocks if b.get("type") == "image"]
+    assert len(image_blocks) == 1
+
+
 def test_report_view_shows_three_zones(client, fake_llm):
     sid = _complete_session(client, fake_llm)
     fake_llm.queue_vision((FIXTURES / "inspector_full.json").read_text(encoding="utf-8"))

@@ -261,7 +261,10 @@ async def run_validation(
         spec = json.loads(row["state_json"])
         schema = loader.load_schema(row["product_type"])
 
-        upload_files = [f for f in (image1, image2, image3, image4) if f is not None]
+        # Browsers send untouched optional file inputs as empty parts
+        # (filename=""), which FastAPI binds to an UploadFile rather than None.
+        # Skip those so we never send an empty image to the vision API.
+        upload_files = [f for f in (image1, image2, image3, image4) if f is not None and f.filename]
         session_uploads = UPLOADS_DIR / session_id
         session_uploads.mkdir(parents=True, exist_ok=True)
         image_paths: list[str] = []
