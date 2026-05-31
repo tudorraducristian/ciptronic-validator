@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block topbar_meta %}Sesiune <code>{{ session_id[:8] }}</code> · {{ product_type|capitalize }}{% endblock %}
+{% block content %}
+<main class="page page--wide">
+    <h1>Specificare {{ product_type }}</h1>
+    <p class="muted" style="margin-bottom: var(--s-6);">
+        Descriere inițială: <em>„{{ initial_description }}"</em>
+    </p>
+    <section class="discovery">
+        {% include "_session_body.html" %}
+    </section>
+</main>
+{% endblock %}

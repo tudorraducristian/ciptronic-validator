@@ -1,0 +1,77 @@
+<div id="session-body">
+    <aside class="card">
+        <h2 class="card__title">Stare specificație <small>(Runda {{ rounds_used }} / 5)</small></h2>
+        <ul class="checklist">
+            {% for entry in field_state %}
+            <li>
+                <span class="checklist__icon {{ 'checklist__icon--done' if entry.filled else 'checklist__icon--pending' }}">
+                    {{ '✓' if entry.filled else '·' }}
+                </span>
+                <div>
+                    <span class="checklist__key">{{ entry.label }}</span>
+                    <span class="checklist__value {{ '' if entry.filled else 'checklist__value--empty' }}">
+                        {{ entry.display_value if entry.filled else 'nu s-a răspuns încă' }}
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </aside>
+
+    {% if done %}
+    <section class="card">
+        <h2 style="font-family: var(--ff-sans); font-size: 18px;">
+            Specificare completă <span class="badge badge--success">✓ done</span>
+        </h2>
+        <div class="callout">
+            <strong>Toate câmpurile completate.</strong> Poți continua cu validarea vizuală.
+        </div>
+        <div class="row-actions" style="justify-content: flex-end;">
+            <a class="btn btn--primary btn--lg" href="/sessions/{{ session_id }}/validate">
+                Validează cu poze <span aria-hidden="true">→</span>
+            </a>
+        </div>
+    </section>
+    {% elif intrebari %}
+    <section class="card">
+        <h2 style="font-family: var(--ff-sans); font-size: 18px;">Întrebări pentru tine</h2>
+        <form hx-post="/sessions/{{ session_id }}/answer"
+              hx-target="#session-body" hx-swap="outerHTML">
+            {% for q in intrebari %}
+            <div class="question">
+                <div class="question__id">câmp: {{ q.id }}</div>
+                <label class="question__text">{{ q.text }}</label>
+                {% if q.variante %}
+                    <div class="radio-group" role="radiogroup">
+                    {% for v in q.variante %}
+                    <label class="radio">
+                        <input type="radio" name="answer.{{ q.id }}" value="{{ v }}" required>
+                        {{ v }}
+                    </label>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <input class="input" type="text" name="answer.{{ q.id }}" required>
+                {% endif %}
+            </div>
+            {% endfor %}
+            <div class="row-actions">
+                <span class="muted" style="font-size: 13px;">Răspunde și trimite.</span>
+                <button type="submit" class="btn btn--primary">Trimite răspunsurile →</button>
+            </div>
+        </form>
+    </section>
+    {% else %}
+    <section class="card">
+        <div class="callout">
+            <strong>Sesiunea s-a închis după 5 runde fără completare totală.</strong>
+            Câmpurile rămase nemarcate sunt afișate ca (necunoscut) mai sus.
+        </div>
+        <div class="row-actions" style="justify-content: flex-end;">
+            <a class="btn btn--primary" href="/sessions/{{ session_id }}/validate">
+                Continuă către validare →
+            </a>
+        </div>
+    </section>
+    {% endif %}
+</div>

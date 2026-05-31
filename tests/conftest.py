@@ -34,3 +34,39 @@ def client(tmp_path, monkeypatch):
     importlib.reload(web_app)
     web_app.init_database()
     return TestClient(web_app.app)
+
+
+class _FakeLLM:
+    """Replacement for LLMClient used in E2E tests."""
+
+    def __init__(self):
+        self.text_responses: list[str] = []
+        self.vision_responses: list[str] = []
+        self.text_calls: list[tuple[str, str]] = []
+        self.vision_calls: list[tuple[str, list]] = []
+
+    def queue_text(self, response: str) -> None:
+        self.text_responses.append(response)
+
+    def queue_vision(self, response: str) -> None:
+        self.vision_responses.append(response)
+
+    def complete_text(self, system: str, user: str) -> str:
+        self.text_calls.append((system, user))
+        if not self.text_responses:
+            raise RuntimeError("FakeLLM: no queued text responses")
+        return self.text_responses.pop(0)
+
+    def complete_vision(self, system: str, content_blocks: list) -> str:
+        self.vision_calls.append((system, content_blocks))
+        if not self.vision_responses:
+            raise RuntimeError("FakeLLM: no queued vision responses")
+        return self.vision_responses.pop(0)
+
+
+@pytest.fixture
+def fake_llm(monkeypatch):
+    fake = _FakeLLM()
+    from web import app as web_app
+    monkeypatch.setattr(web_app, "get_llm_client", lambda: fake)
+    return fake
