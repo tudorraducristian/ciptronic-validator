@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from agents import discovery, inspector
 from agents.llm_client import LLMClient
 from db import repository
+from image_matcher.engine import analyze_sim, compare_real
 from schemas import loader
 
 
@@ -315,5 +316,114 @@ def view_report(report_id: str, request: Request):
             "conform": json.loads(row["conform_json"]),
             "neconform": json.loads(row["neconform_json"]),
             "nevizibil": json.loads(row["nevizibil_json"]),
+        },
+    )
+
+
+@app.get("/matches/new", response_class=HTMLResponse)
+def match_new(request: Request):
+    return TEMPLATES.TemplateResponse(request, "match_new.html")
+
+
+@app.post("/matches")
+async def create_match(sim: UploadFile = File(...)):
+    content = await sim.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Mockup-ul depășește 5MB")
+
+    import uuid as _uuid
+    match_id_prefix = str(_uuid.uuid4())
+    match_uploads = UPLOADS_DIR / "match" / match_id_prefix
+    match_uploads.mkdir(parents=True, exist_ok=True)
+
+    ext = ".png" if sim.content_type == "image/png" else ".jpg"
+    if sim.filename and sim.filename.lower().endswith(".webp"):
+        ext = ".webp"
+    sim_path = match_uploads / f"sim{ext}"
+    sim_path.write_bytes(content)
+
+    try:
+        sim_report = analyze_sim(sim_path)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"analyze_sim a eșuat: {e}")
+
+    with get_conn() as conn:
+        match_id = repository.create_match_session(
+            conn, sim_image_path=str(sim_path), sim_report=sim_report,
+        )
+
+    return Response(status_code=303, headers={"Location": f"/matches/{match_id}"})
+
+
+@app.get("/matches/{match_id}", response_class=HTMLResponse)
+def view_match(match_id: str, request: Request):
+    with get_conn() as conn:
+        row = repository.get_match_session(conn, match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Match inexistent")
+
+    sim_report = json.loads(row["sim_report_json"])
+    criteria = sim_report.get("criteria", [])
+
+    return TEMPLATES.TemplateResponse(
+        request,
+        "match_wait.html",
+        {"match_id": match_id, "criteria": criteria},
+    )
+
+
+@app.post("/matches/{match_id}/real")
+async def upload_match_real(match_id: str, real: UploadFile = File(...)):
+    with get_conn() as conn:
+        row = repository.get_match_session(conn, match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Match inexistent")
+        if row["status"] != "awaiting_real":
+            raise HTTPException(status_code=409, detail="Match nu așteaptă poză reală")
+
+        content = await real.read()
+        if len(content) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Poza reală depășește 5MB")
+
+        sim_path = Path(row["sim_image_path"])
+        match_dir = sim_path.parent
+        ext = ".png" if real.content_type == "image/png" else ".jpg"
+        if real.filename and real.filename.lower().endswith(".webp"):
+            ext = ".webp"
+        real_path = match_dir / f"real{ext}"
+        real_path.write_bytes(content)
+
+        sim_report = json.loads(row["sim_report_json"])
+        try:
+            compare_report = compare_real(sim_report, real_path, max_tokens=8192)
+        except Exception as e:
+            repository.fail_match_session(conn, match_id)
+            raise HTTPException(status_code=502, detail=f"compare_real a eșuat: {e}")
+
+        repository.update_match_compare_report(
+            conn, match_id, real_image_path=str(real_path), compare_report=compare_report,
+        )
+
+    return Response(status_code=303, headers={"Location": f"/matches/{match_id}/report"})
+
+
+@app.get("/matches/{match_id}/report", response_class=HTMLResponse)
+def view_match_report(match_id: str, request: Request):
+    with get_conn() as conn:
+        row = repository.get_match_session(conn, match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Match inexistent")
+        if row["status"] != "complete":
+            raise HTTPException(status_code=409, detail="Raport indisponibil — match nu e complet")
+
+    compare_report = json.loads(row["compare_report_json"])
+
+    return TEMPLATES.TemplateResponse(
+        request,
+        "match_report.html",
+        {
+            "match_id": match_id,
+            "rows": compare_report.get("rows", []),
+            "summary": compare_report.get("summary", {"matched": 0, "mismatched": 0}),
         },
     )

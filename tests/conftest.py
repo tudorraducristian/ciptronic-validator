@@ -70,3 +70,35 @@ def fake_llm(monkeypatch):
     from web import app as web_app
     monkeypatch.setattr(web_app, "get_llm_client", lambda: fake)
     return fake
+
+
+@pytest.fixture
+def fake_image_engine(monkeypatch):
+    """Patch image_matcher.engine functions used by web routes.
+    Tests set .sim_response / .compare_response before triggering the route."""
+    class _Engine:
+        sim_response: dict = {"criteria": []}
+        compare_response: dict = {"rows": [], "summary": {"matched": 0, "mismatched": 0}}
+        analyze_calls: list = []
+        compare_calls: list = []
+
+        @classmethod
+        def reset(cls):
+            cls.analyze_calls = []
+            cls.compare_calls = []
+
+    _Engine.reset()
+
+    def fake_analyze_sim(sim_path, model="claude-sonnet-4-6"):
+        _Engine.analyze_calls.append(str(sim_path))
+        return _Engine.sim_response
+
+    def fake_compare_real(sim_report, real_path, model="claude-sonnet-4-6", max_tokens=8192):
+        _Engine.compare_calls.append((sim_report, str(real_path)))
+        return _Engine.compare_response
+
+    from web import app as web_app
+    monkeypatch.setattr(web_app, "analyze_sim", fake_analyze_sim)
+    monkeypatch.setattr(web_app, "compare_real", fake_compare_real)
+
+    return _Engine

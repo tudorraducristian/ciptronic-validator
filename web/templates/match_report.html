@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block topbar_meta %}Match <code>{{ match_id[:8] }}</code> · pas 3/3{% endblock %}
+{% block content %}
+<main class="page page--wide">
+    <h1>Raport comparație</h1>
+
+    <div class="match-summary">
+        <div class="match-summary__chip">
+            <div class="match-summary__chip__label">Total criterii</div>
+            <div class="match-summary__chip__value">{{ rows|length }}</div>
+        </div>
+        <div class="match-summary__chip match-summary__chip--match">
+            <div class="match-summary__chip__label">Match</div>
+            <div class="match-summary__chip__value">{{ summary.matched }}</div>
+        </div>
+        <div class="match-summary__chip match-summary__chip--mismatch">
+            <div class="match-summary__chip__label">Mismatch</div>
+            <div class="match-summary__chip__value">{{ summary.mismatched }}</div>
+        </div>
+    </div>
+
+    <div class="match-table-wrap">
+        <table class="match-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <th>Criteriu</th>
+                    <th>Sim (mockup)</th>
+                    <th>Real (produs)</th>
+                    <th style="width: 110px;">Tip</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr class="{{ 'is-match' if row.match else 'is-mismatch' }}{{ ' is-extra' if row.match_type == 'extra' else '' }}">
+                    <td>
+                        {% if row.match %}
+                            <span class="match-table__icon match-table__icon--ok">✓</span>
+                        {% elif row.match_type == 'extra' %}
+                            <span class="match-table__icon match-table__icon--extra">+</span>
+                        {% else %}
+                            <span class="match-table__icon match-table__icon--bad">✗</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="match-table__criterion">{{ row.criterion }}</div>
+                        {% if row.note %}<div class="match-table__note">{{ row.note }}</div>{% endif %}
+                    </td>
+                    <td class="match-table__value">{{ row.sim_value or '—' }}</td>
+                    <td class="match-table__value">{{ row.real_value or '—' }}</td>
+                    <td>
+                        {% set badge_class = 'badge--success' if row.match else 'badge--danger' %}
+                        {% if row.match_type == 'extra' %}{% set badge_class = 'badge--warn' %}{% endif %}
+                        <span class="badge {{ badge_class }}">{{ row.match_type }}</span>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row-actions" style="margin-top: var(--s-6);">
+        <a href="/" class="btn btn--secondary">Începe o nouă validare</a>
+    </div>
+</main>
+{% endblock %}

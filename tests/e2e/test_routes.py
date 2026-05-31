@@ -121,3 +121,81 @@ def test_report_view_shows_three_zones(client, fake_llm):
     assert "Neconform" in r.text
     assert "Nevizibil" in r.text
     assert "albastru navy" in r.text
+
+
+def test_get_matches_new_shows_upload_form(client):
+    r = client.get("/matches/new")
+    assert r.status_code == 200
+    assert "Încarcă mockup-ul" in r.text
+    assert 'name="sim"' in r.text
+
+
+def test_post_matches_runs_analyze_sim_and_redirects(client, fake_image_engine):
+    fake_image_engine.sim_response = {
+        "criteria": [
+            {"id": "color", "label": "Color principal", "description": "navy uniform"},
+            {"id": "logo_pos", "label": "Logo poziție", "description": "piept stâng"},
+        ]
+    }
+    files = {"sim": ("mockup.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    r = client.post("/matches", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"].startswith("/matches/")
+    assert len(fake_image_engine.analyze_calls) == 1
+
+
+def test_get_match_session_shows_criteria_and_real_upload(client, fake_image_engine):
+    fake_image_engine.sim_response = {
+        "criteria": [{"id": "color", "label": "Color", "description": "navy"}]
+    }
+    files = {"sim": ("mockup.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    r = client.post("/matches", files=files, follow_redirects=False)
+    match_url = r.headers["Location"]
+
+    r = client.get(match_url)
+    assert r.status_code == 200
+    assert "Criterii detectate" in r.text
+    assert "Color" in r.text
+    assert 'name="real"' in r.text
+
+
+def test_post_match_real_runs_compare_and_redirects_to_report(client, fake_image_engine):
+    fake_image_engine.sim_response = {"criteria": [{"id": "color", "label": "Color", "description": "x"}]}
+    fake_image_engine.compare_response = {
+        "rows": [{"criterion": "Color", "sim_value": "navy", "real_value": "navy",
+                  "match": True, "match_type": "exact", "confidence": "high", "note": ""}],
+        "summary": {"matched": 1, "mismatched": 0, "total": 1},
+    }
+    files = {"sim": ("mockup.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    r = client.post("/matches", files=files, follow_redirects=False)
+    match_id = r.headers["Location"].rsplit("/", 1)[-1]
+
+    files = {"real": ("real.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    r = client.post(f"/matches/{match_id}/real", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"] == f"/matches/{match_id}/report"
+    assert len(fake_image_engine.compare_calls) == 1
+    # compare_real(sim_report: dict, real_path: Path) — guard the argument order
+    recorded_sim_report, recorded_real_path = fake_image_engine.compare_calls[0]
+    assert isinstance(recorded_sim_report, dict) and "criteria" in recorded_sim_report
+    assert recorded_real_path.endswith((".jpg", ".jpeg", ".png", ".webp"))
+
+
+def test_match_report_shows_rows_table(client, fake_image_engine):
+    fake_image_engine.sim_response = {"criteria": [{"id": "c1", "label": "Color", "description": "x"}]}
+    fake_image_engine.compare_response = {
+        "rows": [{"criterion": "Color", "sim_value": "navy", "real_value": "navy",
+                  "match": True, "match_type": "exact", "confidence": "high", "note": ""}],
+        "summary": {"matched": 1, "mismatched": 0, "total": 1},
+    }
+    files = {"sim": ("m.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    r = client.post("/matches", files=files, follow_redirects=False)
+    match_id = r.headers["Location"].rsplit("/", 1)[-1]
+    files = {"real": ("r.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    client.post(f"/matches/{match_id}/real", files=files, follow_redirects=False)
+
+    r = client.get(f"/matches/{match_id}/report")
+    assert r.status_code == 200
+    assert "Color" in r.text
+    assert "navy" in r.text
+    assert "exact" in r.text
