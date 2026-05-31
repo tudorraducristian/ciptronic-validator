@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block topbar_meta %}v0.2 · MVP local{% endblock %}
+{% block content %}
+<main class="page page--narrow">
+    <h1>Validare produs personalizat</h1>
+    <p>
+      Alege felul în care vrei să specifici produsul. Ambele rute duc la un raport de
+      validare, dar pleacă de la inputuri diferite și produc rapoarte diferite.
+    </p>
+
+    <div class="choice-grid">
+      <a class="choice-card" href="/sessions/new">
+        <span class="choice-card__glyph">Aa</span>
+        <h2 class="choice-card__title">Am o descriere</h2>
+        <p class="choice-card__desc">
+          Pornești de la o descriere în cuvinte. Asistentul îți pune întrebări țintite
+          și completează un checklist structurat. La final, validează produsul finit pe
+          poze cu un raport <strong>Conform / Neconform / Nevizibil</strong>.
+        </p>
+        <div class="choice-card__meta">
+          <span>Discovery → Inspector</span><span>·</span>
+          <span>schemă fixă pe tip produs</span>
+        </div>
+        <span class="choice-card__cta">Începe specificare <span aria-hidden="true">→</span></span>
+      </a>
+
+      <a class="choice-card" href="/matches/new">
+        <span class="choice-card__glyph">▣</span>
+        <h2 class="choice-card__title">Am un mockup</h2>
+        <p class="choice-card__desc">
+          Pornești de la o imagine de referință. Sistemul extrage criteriile vizuale
+          și le compară cu poza produsului finit, criteriu cu criteriu. Raport sub
+          formă de <strong>tabel</strong>.
+        </p>
+        <div class="choice-card__meta">
+          <span>Image Match</span><span>·</span><span>agnostic la tip produs</span>
+        </div>
+        <span class="choice-card__cta">Încarcă mockup <span aria-hidden="true">→</span></span>
+      </a>
+    </div>
+</main>
+{% endblock %}
