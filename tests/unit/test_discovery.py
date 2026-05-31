@@ -39,6 +39,15 @@ def test_parse_response_invalid_raises():
         discovery.parse_response(raw)
 
 
+def test_parse_response_strips_markdown_code_fences(schema_tricou):
+    inner = (FIXTURES / "discovery_round1.json").read_text(encoding="utf-8")
+    fenced = f"```json\n{inner}\n```"
+    step = discovery.parse_response(fenced)
+    assert step.done is False
+    assert step.state["culoare_principala"] == "albastru navy"
+    assert len(step.intrebari) == 3
+
+
 def test_is_schema_complete_true_for_full_state(schema_tricou):
     state = {
         "culoare_principala": "navy", "material": "bumbac 100%",

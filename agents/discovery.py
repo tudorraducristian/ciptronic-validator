@@ -16,11 +16,26 @@ class DiscoveryStep:
     done: bool
 
 
-def parse_response(text: str) -> DiscoveryStep:
+def _extract_json(text: str) -> dict:
+    """Try a direct parse; if it fails (e.g. markdown code fences or prose
+    around the object), fall back to the outermost {...} block."""
+    text = text.strip()
     try:
-        data = json.loads(text)
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError(f"Răspunsul LLM nu e JSON valid: {text[:80]!r}")
+    try:
+        return json.loads(text[start : end + 1])
     except json.JSONDecodeError as e:
         raise ValueError(f"Răspunsul LLM nu e JSON valid: {e}") from e
+
+
+def parse_response(text: str) -> DiscoveryStep:
+    data = _extract_json(text)
 
     for key in ("state", "intrebari", "done"):
         if key not in data:

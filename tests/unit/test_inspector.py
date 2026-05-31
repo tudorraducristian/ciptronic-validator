@@ -79,6 +79,15 @@ def test_parse_report_invalid_incredere_raises(schema_tricou, spec_active_brandi
         inspector.parse_report(bad, schema_tricou, spec_active_branding)
 
 
+def test_parse_report_strips_markdown_code_fences(schema_tricou, spec_active_branding):
+    inner = (FIXTURES / "inspector_full.json").read_text(encoding="utf-8")
+    fenced = f"```json\n{inner}\n```"
+    report = inspector.parse_report(fenced, schema_tricou, spec_active_branding)
+    assert len(report.conform) == 6
+    assert len(report.neconform) == 1
+    assert len(report.nevizibil) == 2
+
+
 import base64
 
 
