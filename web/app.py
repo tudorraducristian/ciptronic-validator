@@ -272,7 +272,7 @@ async def run_validation(
             content = await f.read()
             if len(content) > MAX_FILE_SIZE_BYTES:
                 raise HTTPException(status_code=413, detail=f"Poza {i} depășește 5MB")
-            ext = ".png" if f.content_type == "image/png" else ".jpg"
+            ext = _ext_for_upload(f)
             path = session_uploads / f"img{i}{ext}"
             path.write_bytes(content)
             image_paths.append(str(path))
@@ -294,6 +294,25 @@ async def run_validation(
         )
 
     return Response(status_code=303, headers={"Location": f"/reports/{rid}"})
+
+
+def _ext_for_upload(upload) -> str:
+    """Map an uploaded image to a file extension that matches its real format,
+    so the media_type sent to the vision API matches the bytes. Prefer the
+    browser content_type; fall back to the filename suffix."""
+    ct = (upload.content_type or "").lower()
+    if ct == "image/png":
+        return ".png"
+    if ct == "image/webp":
+        return ".webp"
+    if ct in ("image/jpeg", "image/jpg"):
+        return ".jpg"
+    name = (upload.filename or "").lower()
+    if name.endswith(".png"):
+        return ".png"
+    if name.endswith(".webp"):
+        return ".webp"
+    return ".jpg"
 
 
 def _item_to_dict(item) -> dict:

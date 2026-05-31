@@ -143,6 +143,20 @@ def test_post_validate_ignores_empty_optional_file_slots(client, fake_llm):
     assert len(image_blocks) == 1
 
 
+def test_post_validate_preserves_webp_media_type(client, fake_llm):
+    """A WEBP upload must be sent to the vision API with media_type image/webp.
+    Saving it as .jpg made _media_type_for report image/jpeg, which the API
+    rejects because the bytes are webp."""
+    sid = _complete_session(client, fake_llm)
+    fake_llm.queue_vision((FIXTURES / "inspector_full.json").read_text(encoding="utf-8"))
+    files = {"image1": ("photo.webp", io.BytesIO(_tiny_jpeg_bytes()), "image/webp")}
+    r = client.post(f"/sessions/{sid}/validate", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    _system, content_blocks = fake_llm.vision_calls[0]
+    image_block = next(b for b in content_blocks if b.get("type") == "image")
+    assert image_block["source"]["media_type"] == "image/webp"
+
+
 def test_report_view_shows_three_zones(client, fake_llm):
     sid = _complete_session(client, fake_llm)
     fake_llm.queue_vision((FIXTURES / "inspector_full.json").read_text(encoding="utf-8"))
