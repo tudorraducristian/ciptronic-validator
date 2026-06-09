@@ -5,10 +5,15 @@ from pathlib import Path
 from contextlib import contextmanager
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+# Load .env so ANTHROPIC_API_KEY is available even when the app is imported
+# directly (uvicorn web.app:app, tests) without going through main.py.
+load_dotenv()
 
 from agents import discovery, inspector
 from agents.llm_client import LLMClient
