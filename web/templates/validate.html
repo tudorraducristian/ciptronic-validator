@@ -9,9 +9,18 @@
         <strong>Restricții:</strong> JPG / PNG / WEBP · max <strong>5 MB</strong> per poză.
     </div>
 
-    <details class="card" style="margin-bottom: var(--s-4);">
+    <details class="card" style="margin-bottom: var(--s-4);" open>
         <summary><strong>Specificație curentă</strong></summary>
-        <pre style="overflow:auto;">{{ spec_pretty }}</pre>
+        <dl class="spec-list">
+            {% for f in spec_fields %}
+            <div class="spec-list__row">
+                <dt class="spec-list__key">{{ f.label }}</dt>
+                <dd class="spec-list__value {{ '' if f.filled else 'spec-list__value--empty' }}">
+                    {{ f.display_value if f.filled else '—' }}
+                </dd>
+            </div>
+            {% endfor %}
+        </dl>
     </details>
 
     <form class="card" action="/sessions/{{ session_id }}/validate" method="post"

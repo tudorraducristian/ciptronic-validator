@@ -222,6 +222,25 @@ def _build_session_context(*, session_id, product_type, initial_description,
     }
 
 
+def _spec_field_list(schema, state) -> list[dict]:
+    """Flatten the spec into readable {label, value, filled} rows (same logic as
+    the session checklist) so the validate page can list them instead of raw
+    JSON."""
+    applicable = loader.applicable_leaf_keys(schema, state)
+    fields = []
+    for f in schema["fields"]:
+        if f.get("type") == "object":
+            for sub in f["subfields"]:
+                dotted = f"{f['key']}.{sub['key']}"
+                if dotted not in applicable:
+                    continue
+                value = (state.get(f["key"]) or {}).get(sub["key"])
+                fields.append(_field_entry(f"{f['label']} → {sub['label']}", value))
+        else:
+            fields.append(_field_entry(f["label"], state.get(f["key"])))
+    return fields
+
+
 def _field_entry(label: str, value) -> dict:
     filled = value is not None and value != "" and value != []
     display = ", ".join(str(v) for v in value) if isinstance(value, list) else (str(value) if value is not None else "")
@@ -238,12 +257,13 @@ def validate_page(session_id: str, request: Request):
             raise HTTPException(status_code=409, detail="Sesiunea nu e completă încă")
 
     spec = json.loads(row["state_json"])
+    schema = loader.load_schema(row["product_type"])
     return TEMPLATES.TemplateResponse(
         request,
         "validate.html",
         {
             "session_id": session_id,
-            "spec_pretty": json.dumps(spec, ensure_ascii=False, indent=2),
+            "spec_fields": _spec_field_list(schema, spec),
         },
     )
 

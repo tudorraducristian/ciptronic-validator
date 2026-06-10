@@ -384,6 +384,30 @@ a:hover { color: var(--c-accent); }
   font-weight: 400;
 }
 
+/* Spec list — readable label/value rows (validate page), one under another */
+.spec-list { margin: 0; padding: 0; }
+.spec-list__row {
+  display: grid;
+  grid-template-columns: minmax(150px, 240px) 1fr;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px dashed var(--c-border);
+}
+.spec-list__row:last-child { border-bottom: none; }
+.spec-list__key {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-soft);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.spec-list__value { margin: 0; color: var(--c-text); font-weight: 500; }
+.spec-list__value--empty { color: var(--c-text-soft); font-style: italic; font-weight: 400; }
+@media (max-width: 560px) {
+  .spec-list__row { grid-template-columns: 1fr; gap: var(--s-1); }
+}
+
 /* ---------- Discovery — two-column layout ---------- */
 .discovery {
   display: grid;
