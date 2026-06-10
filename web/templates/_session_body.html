@@ -1,18 +1,16 @@
 <div id="session-body">
     <aside class="card">
         <h2 class="card__title">Stare specificație <small>(Runda {{ rounds_used }} / 5)</small></h2>
-        <ul class="checklist">
+        <ul class="spec-grid">
             {% for entry in field_state %}
-            <li>
-                <span class="checklist__icon {{ 'checklist__icon--done' if entry.filled else 'checklist__icon--pending' }}">
-                    {{ '✓' if entry.filled else '·' }}
+            <li class="spec-item {{ 'spec-item--done' if entry.filled else '' }}">
+                <span class="spec-item__key">
+                    <span class="spec-item__dot" aria-hidden="true">{{ '✓' if entry.filled else '·' }}</span>
+                    {{ entry.label }}
                 </span>
-                <div>
-                    <span class="checklist__key">{{ entry.label }}</span>
-                    <span class="checklist__value {{ '' if entry.filled else 'checklist__value--empty' }}">
-                        {{ entry.display_value if entry.filled else 'nu s-a răspuns încă' }}
-                    </span>
-                </div>
+                <span class="spec-item__value {{ '' if entry.filled else 'spec-item__value--empty' }}">
+                    {{ entry.display_value if entry.filled else 'nu s-a răspuns încă' }}
+                </span>
             </li>
             {% endfor %}
         </ul>

@@ -527,3 +527,93 @@ def test_render_table_truncates_long_values():
     assert "…" in out
     longest_line = max(len(line) for line in out.splitlines())
     assert longest_line <= 80
+
+
+# ---- logo orientation / mirroring sub-check ----
+
+from image_matcher.engine import (
+    _logo_criteria,
+    apply_mirror_downgrades,
+    build_orientation_messages,
+    parse_orientation_response,
+)
+
+
+def test_logo_criteria_selects_placed_graphics():
+    sim = {"criteria": [
+        {"id": "body_color", "label": "Culoare", "details": {"color_name": "verde"}},
+        {"id": "chest_logo", "label": "Logo Swoosh",
+         "details": {"shape": "swoosh", "position_normalized": {"x_pct": 62, "y_pct": 30}}},
+        {"id": "chest_text", "label": "Text piept",
+         "details": {"text_content": "CoRAI", "position_normalized": {"x_pct": 50, "y_pct": 42}}},
+        {"id": "collar", "label": "Guler",
+         "details": {"position_normalized": {"x_pct": 50, "y_pct": 5}}},
+    ]}
+    ids = [c["id"] for c in _logo_criteria(sim)]
+    assert "chest_logo" in ids       # has shape + position
+    assert "chest_text" in ids       # 'text' keyword + position
+    assert "body_color" not in ids   # no position
+    assert "collar" not in ids       # position but no graphic hint
+
+
+def test_parse_orientation_response_extracts_mirrored():
+    raw = json.dumps({"logos": [
+        {"label": "Logo Swoosh", "mirrored": True, "note": "x"},
+        {"label": "Text CoRAI", "mirrored": False, "note": "y"},
+    ]})
+    res = parse_orientation_response(raw)
+    assert res["logo swoosh"] is True
+    assert res["text corai"] is False
+
+
+def test_parse_orientation_response_garbage_returns_empty():
+    assert parse_orientation_response("not json at all") == {}
+
+
+def test_apply_mirror_downgrades_marks_partial_and_resummarizes():
+    report = {
+        "rows": [
+            {"criterion": "Logo Swoosh", "match": True, "match_type": "semantic",
+             "confidence": "high", "note": "ok", "differences": []},
+            {"criterion": "Culoare", "match": True, "match_type": "exact",
+             "confidence": "high", "note": "ok", "differences": []},
+        ],
+        "summary": {"total": 2, "matched": 2, "mismatched": 0},
+    }
+    out = apply_mirror_downgrades(report, {"logo swoosh": True})
+    logo = out["rows"][0]
+    assert logo["match"] is False
+    assert logo["match_type"] == "partial"
+    assert any("oglindit" in d for d in logo["differences"])
+    assert out["rows"][1]["match"] is True            # untouched
+    assert out["summary"]["matched"] == 1
+    assert out["summary"]["mismatched"] == 1
+    assert out["summary"]["by_match_type"]["partial"] == 1
+
+
+def test_apply_mirror_downgrades_empty_is_noop():
+    report = {
+        "rows": [{"criterion": "Logo", "match": True, "match_type": "exact",
+                  "confidence": "high", "note": "ok"}],
+        "summary": {"total": 1, "matched": 1, "mismatched": 0},
+    }
+    out = apply_mirror_downgrades(report, {})
+    assert out["rows"][0]["match"] is True
+
+
+def test_build_orientation_messages_structure(tmp_path):
+    from PIL import Image
+    p_sim, p_real = tmp_path / "sim.png", tmp_path / "real.png"
+    Image.new("RGB", (200, 300), (180, 210, 194)).save(p_sim)
+    Image.new("RGB", (200, 300), (180, 210, 194)).save(p_real)
+    logos = [{"id": "chest_logo", "label": "Logo Swoosh",
+              "details": {"shape": "swoosh",
+                          "position_normalized": {"x_pct": 60, "y_pct": 30}}}]
+
+    system, messages = build_orientation_messages(logos, p_sim, p_real)
+
+    assert "ORIENTATION" in system
+    content = messages[0]["content"]
+    images = [b for b in content if b["type"] == "image"]
+    assert len(images) == 2  # one mockup crop + one real crop
+    assert all(b["source"]["media_type"] == "image/png" for b in images)

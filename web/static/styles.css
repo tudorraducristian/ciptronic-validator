@@ -180,8 +180,8 @@ a:hover { color: var(--c-accent); }
 }
 
 .radio-group {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--s-2);
 }
 .radio {
@@ -323,6 +323,65 @@ a:hover { color: var(--c-accent); }
   margin: var(--s-2) 0 0 var(--s-2);
   padding: var(--s-2) 0 0 var(--s-3);
   border-left: 2px solid var(--c-border);
+}
+
+/* ---------- Session / spec page: full-width flow + field grid ---------- */
+.session-flow { display: block; }
+
+.spec-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--s-3);
+}
+.spec-item {
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-border);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  background: var(--c-surface-2);
+}
+.spec-item--done { border-left-color: var(--c-accent-ink); }
+.spec-item__key {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-soft);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  margin-bottom: 6px;
+}
+.spec-item__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--c-surface);
+  color: var(--c-text-soft);
+}
+.spec-item--done .spec-item__dot {
+  background: var(--c-accent-soft);
+  color: var(--c-accent-ink);
+}
+.spec-item__value {
+  display: block;
+  color: var(--c-text);
+  font-weight: 500;
+  font-size: 14px;
+}
+.spec-item__value--empty {
+  color: var(--c-text-soft);
+  font-style: italic;
+  font-weight: 400;
 }
 
 /* ---------- Discovery — two-column layout ---------- */

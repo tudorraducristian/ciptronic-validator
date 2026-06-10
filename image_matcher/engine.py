@@ -6,6 +6,7 @@ function (`call_llm`) and the orchestrators (analyze_sim, compare_real,
 process_pair) are verified manually with the checklist in README.md.
 """
 import base64
+import io
 import json
 import logging
 import os
@@ -277,6 +278,23 @@ NOT in sim_report (extras).
    flag ONLY differences that are intrinsic to how the design is printed or
    applied. When in doubt about whether a shift is intrinsic or just perspective,
    do not claim an exact match — use `partial` and explain the uncertainty.
+4c. COLOR SHADE IS PART OF SAMENESS. If the real product reads as a visibly
+   different shade or tone than the mockup (e.g. mint green vs sage green, navy
+   vs royal blue) — even when both are loosely "a kind of green/blue" — that is
+   `partial`. Record the shade you actually observe in real_value and the gap in
+   differences. Do NOT dismiss a visible color difference as photo lighting or
+   "calibration"; report what you see. Reserve `exact`/`semantic` for colors
+   that genuinely read as the SAME shade, where only a faint lighting shift
+   separates them.
+4d. ORIENTATION, SIDE, AND MIRRORING. For every logo, graphic, or asymmetric
+   mark, check explicitly: (a) Is it MIRRORED / flipped left-right compared to
+   the mockup? For an asymmetric mark like a Nike swoosh, which way does the tip
+   point and which way does the tail sweep? (b) Which side of the chest does it
+   sit on — the wearer's left or right? A mirrored, rotated, or wrong-side logo
+   is a real manufacturing defect → `partial`, never a match. State the
+   orientation and side you observe in real_value.
+4e. FIT / SILHOUETTE. A clearly different garment cut (e.g. slim/regular vs
+   oversized) is `partial`, not a match — describe the real fit you observe.
 5. `match_type` is one of: exact, semantic, partial, missing_in_real, extra_on_real.
    Use `partial` when the element is the same kind/content but differs in a
    real attribute — most importantly placement or relative size (rules 4a/4b),
@@ -379,6 +397,26 @@ _MATCH_TYPES = {"exact", "semantic", "partial", "missing_in_real", "extra_on_rea
 _CONFIDENCES = {"high", "medium", "low"}
 
 
+def _summarize(rows: list[dict]) -> dict:
+    """Build the summary block from rows. `match` is treated as the source of
+    truth (it is itself derived from match_type), so callers can mutate rows —
+    e.g. downgrade a mirrored logo to `partial` — and re-summarize."""
+    by_match_type = {mt: 0 for mt in _MATCH_TYPES}
+    by_confidence = {c: 0 for c in _CONFIDENCES}
+    for r in rows:
+        by_match_type[r["match_type"]] += 1
+        if r.get("confidence") in by_confidence:
+            by_confidence[r["confidence"]] += 1
+    matched = sum(1 for r in rows if r["match"] is True)
+    return {
+        "total": len(rows),
+        "matched": matched,
+        "mismatched": len(rows) - matched,
+        "by_match_type": by_match_type,
+        "by_confidence": by_confidence,
+    }
+
+
 def parse_compare_response(text: str) -> dict:
     """Parse and validate the comparison JSON. Raise ValueError on any issue."""
     data = _extract_json(text)
@@ -435,31 +473,181 @@ def parse_compare_response(text: str) -> dict:
     # Summary is fully derivable from rows; recompute it instead of trusting the
     # LLM. Sonnet 4.6 reliably gets row-level decisions right but mis-counts
     # totals/distributions in long lists, so we use rows as the source of truth.
-    matched_count = sum(1 for r in rows if r["match"] is True)
-    by_match_type = {mt: 0 for mt in _MATCH_TYPES}
-    by_confidence = {c: 0 for c in _CONFIDENCES}
-    for r in rows:
-        by_match_type[r["match_type"]] += 1
-        by_confidence[r["confidence"]] += 1
+    summary = _summarize(rows)
     llm_summary = data.get("summary")
     if isinstance(llm_summary, dict) and (
-        llm_summary.get("total") != len(rows)
-        or llm_summary.get("matched") != matched_count
+        llm_summary.get("total") != summary["total"]
+        or llm_summary.get("matched") != summary["matched"]
     ):
         logger.info(
             "compare summary diverged from rows (LLM: total=%s matched=%s; "
             "actual: total=%s matched=%s) — recomputed",
             llm_summary.get("total"), llm_summary.get("matched"),
-            len(rows), matched_count,
+            summary["total"], summary["matched"],
         )
-    data["summary"] = {
-        "total": len(rows),
-        "matched": matched_count,
-        "mismatched": len(rows) - matched_count,
-        "by_match_type": by_match_type,
-        "by_confidence": by_confidence,
-    }
+    data["summary"] = summary
     return data
+
+
+# ---- Logo orientation / mirroring sub-check -------------------------------
+# The main compare model reliably misses left-right mirroring of a logo (a known
+# vision-model weakness). We isolate the question: crop and enlarge the logo from
+# both images and ask one focused call ONLY about orientation. The mirror is
+# obvious once the mark is enlarged side by side.
+
+ORIENTATION_PROMPT = """You inspect logos/graphics for ONE thing: left-right ORIENTATION.
+
+For each logo you receive two enlarged crops — the MOCKUP version and the REAL
+version. Decide whether the REAL logo is MIRRORED (horizontally flipped) relative
+to the mockup.
+
+Reason explicitly about which way asymmetric parts point. For a Nike swoosh: does
+the sharp tip point up to the LEFT or up to the RIGHT, and on which side is the
+thick rounded end? For text: does it read normally or backwards? If the real
+version is the left-right mirror image of the mockup, it is mirrored.
+
+Ignore color, size, position, fabric, lighting and background — ONLY orientation.
+
+Respond with a SINGLE JSON object, no prose:
+{ "logos": [ { "label": "<the logo label given>", "mirrored": true | false,
+              "mockup_points": "<direction in mockup, Romanian>",
+              "real_points": "<direction in real, Romanian>",
+              "note": "<one sentence, Romanian>" } ] }
+Keep the keys and booleans exactly as shown; all human-readable text in Romanian."""
+
+
+def _logo_criteria(sim_report: dict) -> list[dict]:
+    """Pick sim criteria that are placed graphics/logos worth an orientation
+    check — they have a normalized position and look like a mark, not a fabric
+    property."""
+    out = []
+    for c in sim_report.get("criteria", []):
+        if not isinstance(c, dict):
+            continue
+        d = c.get("details") or {}
+        pos = d.get("position_normalized")
+        if not (isinstance(pos, dict) and "x_pct" in pos and "y_pct" in pos):
+            continue
+        hay = f"{c.get('id', '')} {c.get('label', '')}".lower()
+        looks_graphic = bool(d.get("shape")) or any(
+            k in hay for k in ("logo", "grafic", "graphic", "swoosh", "emblem",
+                               "sigl", "print", "imprim", "copac", "text")
+        )
+        if looks_graphic:
+            out.append(c)
+    return out
+
+
+def _crop_logo_b64(path: Path, x_pct: float, y_pct: float, zoom: int = 3) -> str:
+    """Return a base64 PNG of an enlarged crop centered on (x_pct, y_pct). The
+    box is generous so the logo stays in frame even when the real product is
+    framed differently from the mockup."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    cx, cy = w * x_pct / 100.0, h * y_pct / 100.0
+    bw, bh = w * 0.34, h * 0.24
+    box = (
+        max(0, int(cx - bw / 2)), max(0, int(cy - bh / 2)),
+        min(w, int(cx + bw / 2)), min(h, int(cy + bh / 2)),
+    )
+    crop = im.crop(box)
+    crop = crop.resize((max(1, crop.width * zoom), max(1, crop.height * zoom)))
+    buf = io.BytesIO()
+    crop.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def build_orientation_messages(
+    logos: list[dict], sim_path: Path, real_path: Path
+) -> tuple[str, list[dict]]:
+    """Build the focused orientation call: per logo, an enlarged mockup crop and
+    real crop, labeled. `logos` are sim criteria (each with a position)."""
+    content: list[dict] = []
+    for c in logos:
+        pos = c["details"]["position_normalized"]
+        x, y = pos["x_pct"], pos["y_pct"]
+        label = c.get("label") or c.get("id")
+        content.append({"type": "text", "text": f"Logo: {label!r} — MOCKUP:"})
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/png",
+                       "data": _crop_logo_b64(sim_path, x, y)},
+        })
+        content.append({"type": "text", "text": f"Logo: {label!r} — REAL:"})
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/png",
+                       "data": _crop_logo_b64(real_path, x, y)},
+        })
+    content.append({"type": "text", "text": (
+        "For each logo above decide if the REAL crop is mirrored vs the MOCKUP "
+        "crop. Return the JSON described in the system prompt."
+    )})
+    return ORIENTATION_PROMPT, [{"role": "user", "content": content}]
+
+
+def parse_orientation_response(text: str) -> dict:
+    """Return {label_lower: mirrored_bool}. Lenient: anything unparseable yields
+    an empty dict so the sub-check can never break the main report."""
+    try:
+        data = _extract_json(text)
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    result: dict[str, bool] = {}
+    for item in (data.get("logos") or []):
+        if isinstance(item, dict) and item.get("label") is not None:
+            result[str(item["label"]).strip().lower()] = bool(item.get("mirrored"))
+    return result
+
+
+def detect_mirrored_logos(
+    sim_report: dict, sim_path: Path, real_path: Path,
+    model: str = "claude-sonnet-4-6",
+) -> dict:
+    """Focused sub-check: which logos are mirrored on the real product. Returns
+    {label_lower: True} for mirrored logos. Never raises — any failure logs and
+    returns {}, so the main report is unaffected."""
+    try:
+        logos = _logo_criteria(sim_report)
+        if not logos:
+            return {}
+        system, messages = build_orientation_messages(logos, sim_path, real_path)
+        raw = call_llm(system, messages, model=model, max_tokens=1024)
+        verdicts = parse_orientation_response(raw)
+        return {label: True for label, m in verdicts.items() if m}
+    except Exception as e:  # pragma: no cover - defensive, exercised live
+        logger.warning("logo orientation sub-check failed: %s", e)
+        return {}
+
+
+def apply_mirror_downgrades(report: dict, mirrored: dict) -> dict:
+    """Downgrade compare rows whose logo is mirrored to `partial` and recompute
+    the summary. Matches a row to a mirrored label by normalized equality or
+    containment. Mutates and returns `report`."""
+    if not mirrored:
+        return report
+    for row in report.get("rows", []):
+        crit = str(row.get("criterion", "")).strip().lower()
+        if not crit:
+            continue
+        hit = any(
+            crit == label or label in crit or crit in label
+            for label in mirrored
+        )
+        if hit and row.get("match_type") in ("exact", "semantic"):
+            row["match_type"] = "partial"
+            row["match"] = False
+            diffs = row.get("differences") or []
+            diffs.append("Logo oglindit orizontal (stânga-dreapta) față de mockup.")
+            row["differences"] = diffs
+            note = (row.get("note") or "").strip()
+            row["note"] = (note + " Logoul este oglindit față de mockup.").strip()
+    report["summary"] = _summarize(report["rows"])
+    return report
 
 
 def render_table(report: dict, width: int = 80) -> str:
@@ -600,6 +788,12 @@ def compare_real(
         ]
         raw = call_llm(system, retry_messages, model=model, max_tokens=max_tokens)
         report = parse_compare_response(raw)  # raises if still bad
+
+    # Focused follow-up: the main model misses left-right logo mirroring, so we
+    # ask a dedicated call on enlarged logo crops and downgrade mirrored logos.
+    mirrored = detect_mirrored_logos(sim_report, sim_path, real_path, model=model)
+    report = apply_mirror_downgrades(report, mirrored)
+
     report["real_image"] = real_path.name
     return report
 
