@@ -279,7 +279,8 @@ def test_compare_prompt_exists():
 def test_build_compare_messages_structure():
     sim_report = _valid_sim_dict()
     system, messages = build_compare_messages(
-        sim_report, "B64", "image/jpeg", "tshirt_01_real.jpg"
+        sim_report, "SIMB64", "image/png", "REALB64", "image/jpeg",
+        "tshirt_01_real.jpg",
     )
 
     assert system == COMPARE_PROMPT
@@ -289,16 +290,18 @@ def test_build_compare_messages_structure():
     image_blocks = [b for b in content if b["type"] == "image"]
     text_blocks = [b for b in content if b["type"] == "text"]
 
-    assert len(image_blocks) == 1
-    assert image_blocks[0]["source"]["media_type"] == "image/jpeg"
-    assert image_blocks[0]["source"]["data"] == "B64"
+    # Both images are sent: mockup first, then the real photo.
+    assert len(image_blocks) == 2
+    assert image_blocks[0]["source"]["media_type"] == "image/png"
+    assert image_blocks[0]["source"]["data"] == "SIMB64"
+    assert image_blocks[1]["source"]["media_type"] == "image/jpeg"
+    assert image_blocks[1]["source"]["data"] == "REALB64"
 
-    assert len(text_blocks) == 1
-    text = text_blocks[0]["text"]
-    assert "tshirt_01_real.jpg" in text
+    full_text = " ".join(b["text"] for b in text_blocks)
+    assert "tshirt_01_real.jpg" in full_text
     # The sim_report JSON should be embedded so the LLM sees it.
-    assert "main_color" in text
-    assert "chest_logo" in text
+    assert "main_color" in full_text
+    assert "chest_logo" in full_text
 
 
 from image_matcher.engine import parse_compare_response
@@ -377,11 +380,34 @@ def test_parse_compare_response_invalid_confidence():
         parse_compare_response(json.dumps(d))
 
 
-def test_parse_compare_response_match_true_with_null():
+def test_parse_compare_response_exact_with_null_value():
     d = _valid_compare_dict()
-    d["rows"][1]["match"] = True  # row has real_value None
-    with pytest.raises(ValueError, match="match=true"):
+    d["rows"][1]["match_type"] = "exact"  # but real_value is None
+    with pytest.raises(ValueError, match="non-null"):
         parse_compare_response(json.dumps(d))
+
+
+def test_parse_compare_response_partial_is_not_a_match():
+    # The LLM commonly returns match_type="partial" with match=true (e.g. a logo
+    # that is present but mispositioned/resized). `match` must be derived from
+    # match_type, so partial counts as a mismatch — not a green tick.
+    d = _valid_compare_dict()
+    d["rows"][0]["match_type"] = "partial"
+    d["rows"][0]["match"] = True  # LLM's inconsistent boolean
+    d["rows"][0]["differences"] = ["logo on left chest, not centered"]
+    report = parse_compare_response(json.dumps(d))
+    assert report["rows"][0]["match"] is False
+    assert report["summary"]["matched"] == 0
+    assert report["summary"]["mismatched"] == 2
+    assert report["summary"]["by_match_type"]["partial"] == 1
+
+
+def test_parse_compare_response_semantic_stays_a_match():
+    # Guard the other direction: exact/semantic must remain matches.
+    d = _valid_compare_dict()
+    report = parse_compare_response(json.dumps(d))
+    assert report["rows"][0]["match"] is True  # match_type == "semantic"
+    assert report["summary"]["matched"] == 1
 
 
 def test_parse_compare_response_missing_in_real_with_non_null_real():

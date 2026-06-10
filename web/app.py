@@ -7,7 +7,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -422,7 +422,9 @@ async def upload_match_real(match_id: str, real: UploadFile = File(...)):
 
         sim_report = json.loads(row["sim_report_json"])
         try:
-            compare_report = compare_real(sim_report, real_path, max_tokens=8192)
+            compare_report = compare_real(
+                sim_report, sim_path, real_path, max_tokens=8192
+            )
         except Exception as e:
             repository.fail_match_session(conn, match_id)
             raise HTTPException(status_code=502, detail=f"compare_real a eșuat: {e}")
@@ -432,6 +434,23 @@ async def upload_match_real(match_id: str, real: UploadFile = File(...)):
         )
 
     return Response(status_code=303, headers={"Location": f"/matches/{match_id}/report"})
+
+
+@app.get("/matches/{match_id}/image/{kind}")
+def match_image(match_id: str, kind: str):
+    """Serve a match's stored mockup or real photo so the report can show them
+    side by side. Scoped to the two known image slots — never exposes the
+    wider uploads directory."""
+    if kind not in ("sim", "real"):
+        raise HTTPException(status_code=404, detail="Imagine inexistentă")
+    with get_conn() as conn:
+        row = repository.get_match_session(conn, match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Match inexistent")
+    path_str = row["sim_image_path"] if kind == "sim" else row["real_image_path"]
+    if not path_str or not Path(path_str).is_file():
+        raise HTTPException(status_code=404, detail="Imagine indisponibilă")
+    return FileResponse(Path(path_str))
 
 
 @app.get("/matches/{match_id}/report", response_class=HTMLResponse)
@@ -452,5 +471,7 @@ def view_match_report(match_id: str, request: Request):
             "match_id": match_id,
             "rows": compare_report.get("rows", []),
             "summary": compare_report.get("summary", {"matched": 0, "mismatched": 0}),
+            "sim_image_url": f"/matches/{match_id}/image/sim",
+            "real_image_url": f"/matches/{match_id}/image/real",
         },
     )

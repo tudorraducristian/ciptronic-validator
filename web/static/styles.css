@@ -804,7 +804,42 @@ a:hover { color: var(--c-accent); }
   line-height: 1.5;
 }
 
-/* ---------- Match flow: summary chips + results table ---------- */
+/* ---------- Match flow: side-by-side images + summary chips + results table ---------- */
+.match-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+  margin: 0 auto var(--s-5);
+  max-width: 560px;
+}
+.match-compare__item {
+  margin: 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--s-3);
+}
+.match-compare__cap {
+  font-family: var(--ff-sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-soft);
+  margin: 0 0 var(--s-3);
+}
+.match-compare__item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: var(--r-md);
+}
+@media (max-width: 560px) {
+  .match-compare { grid-template-columns: 1fr; max-width: 320px; }
+}
+
 .match-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

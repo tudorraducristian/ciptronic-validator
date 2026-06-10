@@ -93,8 +93,8 @@ def fake_image_engine(monkeypatch):
         _Engine.analyze_calls.append(str(sim_path))
         return _Engine.sim_response
 
-    def fake_compare_real(sim_report, real_path, model="claude-sonnet-4-6", max_tokens=8192):
-        _Engine.compare_calls.append((sim_report, str(real_path)))
+    def fake_compare_real(sim_report, sim_path, real_path, model="claude-sonnet-4-6", max_tokens=8192):
+        _Engine.compare_calls.append((sim_report, str(sim_path), str(real_path)))
         return _Engine.compare_response
 
     from web import app as web_app

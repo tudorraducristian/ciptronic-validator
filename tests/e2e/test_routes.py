@@ -224,9 +224,13 @@ def test_post_match_real_runs_compare_and_redirects_to_report(client, fake_image
     assert r.status_code == 303
     assert r.headers["Location"] == f"/matches/{match_id}/report"
     assert len(fake_image_engine.compare_calls) == 1
-    # compare_real(sim_report: dict, real_path: Path) — guard the argument order
-    recorded_sim_report, recorded_real_path = fake_image_engine.compare_calls[0]
+    # compare_real(sim_report, sim_path, real_path) — guard the argument order;
+    # both image paths must be passed so the model compares them visually.
+    recorded_sim_report, recorded_sim_path, recorded_real_path = (
+        fake_image_engine.compare_calls[0]
+    )
     assert isinstance(recorded_sim_report, dict) and "criteria" in recorded_sim_report
+    assert recorded_sim_path.endswith((".jpg", ".jpeg", ".png", ".webp"))
     assert recorded_real_path.endswith((".jpg", ".jpeg", ".png", ".webp"))
 
 

@@ -225,13 +225,27 @@ def parse_sim_response(text: str) -> dict:
 
 
 COMPARE_PROMPT = """You are a meticulous visual inspector comparing a real product
-photo against a previously-analyzed 2D mockup.
+photo against its 2D mockup.
 
-You receive: a JSON report from the mockup (sim_report) and a photo of the
-real product.
+You receive TWO images and one JSON report:
+- Image 1 — the MOCKUP (the 2D design).
+- Image 2 — the REAL product photo.
+- sim_report — a JSON analysis of the mockup (Image 1).
 
-For EACH criterion in sim_report: find it in the real photo, decide if it
-matches. Additionally: identify criteria visible on the real product that were
+Compare the two images DIRECTLY, side by side, with your own eyes. The
+sim_report is only a checklist of criteria to walk through — it is NOT ground
+truth about the real product. You MUST measure every value on the REAL product
+by looking at Image 2 yourself.
+
+CRITICAL — do NOT anchor on the mockup. NEVER copy a value from sim_report (or
+sim_details) into real_value / real_details. If the mockup says the logo is
+centered at 50% and 5x6 cm, that tells you NOTHING about the real product — look
+at Image 2 and report what is actually there (it may be smaller, off to one
+side, a different layout). A real_value that merely echoes the sim_value is a
+bug; describe what you genuinely observe in Image 2.
+
+For EACH criterion in sim_report: locate it in Image 2, decide if it matches.
+Additionally: identify criteria visible on the real product (Image 2) that were
 NOT in sim_report (extras).
 
 ## Strict rules
@@ -246,7 +260,28 @@ NOT in sim_report (extras).
 4. `match: true` ONLY when both `sim_value` and `real_value` are non-null AND
    describe the same thing (semantically — "navy blue" and "dark navy" match;
    "navy blue" and "red" do not).
+4a. POSITION AND SIZE ARE PART OF SAMENESS. For any placed or sized element
+   (logo, graphic, print, text, badge, pocket, embroidery — anything that has a
+   location or size on the garment), an element is NOT a match unless it also
+   sits in the same place on the garment AND has the same relative size. A logo
+   that is centered on the chest in the mockup but on the left chest on the real
+   product is NOT a match. A logo (or text) that is clearly larger or smaller
+   relative to the garment is NOT a match. In these cases set `match: false`,
+   `match_type: "partial"`, and state the exact placement/size discrepancy in
+   `differences` and `note`. Use `sim_details.position_normalized` and
+   `sim_details.size_estimate_cm` as the mockup reference when present.
+4b. Judge position and size RELATIVE TO GARMENT LANDMARKS — the collar, the
+   shoulder seams, the vertical center line of the body, the chest width — NOT
+   relative to the image frame. Ignore apparent shifts that are only artifacts
+   of camera angle, perspective, folds, or how the garment is laid out or worn;
+   flag ONLY differences that are intrinsic to how the design is printed or
+   applied. When in doubt about whether a shift is intrinsic or just perspective,
+   do not claim an exact match — use `partial` and explain the uncertainty.
 5. `match_type` is one of: exact, semantic, partial, missing_in_real, extra_on_real.
+   Use `partial` when the element is the same kind/content but differs in a
+   real attribute — most importantly placement or relative size (rules 4a/4b),
+   but also a meaningful color, shape, or finishing difference. `partial` always
+   implies `match: false`.
 6. `confidence` is one of: high, medium, low.
 7. NEVER claim match: true for something you cannot see in the real photo.
    If a criterion is in sim but you cannot see it (back of product, occluded,
@@ -254,6 +289,8 @@ NOT in sim_report (extras).
    match_type: "missing_in_real", confidence: "low", and explain in note.
 8. note is mandatory — one sentence justifying the decision.
 9. differences lists specific visual discrepancies, empty list when match is exact.
+   Any placement or relative-size difference (rules 4a/4b) MUST appear here, not
+   only in note.
 10. real_details mirrors the structure of sim_details where possible.
 11. summary.total must equal len(rows). summary.matched + summary.mismatched
     must equal summary.total. Recount carefully.
@@ -295,28 +332,42 @@ NOT in sim_report (extras).
 
 
 def build_compare_messages(
-    sim_report: dict, image_b64: str, media_type: str, filename: str
+    sim_report: dict,
+    sim_b64: str,
+    sim_media_type: str,
+    real_b64: str,
+    real_media_type: str,
+    real_filename: str,
 ) -> tuple[str, list[dict]]:
-    """Return (system_prompt, messages) for the comparison LLM call."""
+    """Return (system_prompt, messages) for the comparison LLM call.
+
+    Sends BOTH images — the mockup (Image 1) and the real product photo
+    (Image 2) — so the model compares them visually instead of anchoring on the
+    sim_report text and echoing the mockup's values.
+    """
     sim_json = json.dumps(sim_report, indent=2, ensure_ascii=False)
     user_text = (
-        f"The real product photo filename is {filename!r}. Use it verbatim in "
-        f"the `real_image` field. The mockup analysis (sim_report) is:\n\n"
+        f"The real product photo filename is {real_filename!r}. Use it verbatim "
+        f"in the `real_image` field. Below is the mockup analysis (sim_report) — "
+        f"a checklist only, NOT ground truth about the real product:\n\n"
         f"```json\n{sim_json}\n```\n\n"
         f"Return the JSON described in the system prompt."
     )
+
+    def _image_block(media_type: str, data: str) -> dict:
+        return {
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": data},
+        }
+
     messages = [
         {
             "role": "user",
             "content": [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": image_b64,
-                    },
-                },
+                {"type": "text", "text": "Image 1 — MOCKUP (the 2D design):"},
+                _image_block(sim_media_type, sim_b64),
+                {"type": "text", "text": "Image 2 — REAL product photo:"},
+                _image_block(real_media_type, real_b64),
                 {"type": "text", "text": user_text},
             ],
         }
@@ -356,11 +407,21 @@ def parse_compare_response(text: str) -> dict:
                 f"row {i}: invalid confidence {row['confidence']!r}, "
                 f"allowed: {sorted(_CONFIDENCES)}"
             )
+        # `match` is a pure function of `match_type`: only exact/semantic
+        # equivalence counts as a match. The LLM frequently returns match=true
+        # alongside match_type="partial" (e.g. a logo that is present but
+        # mispositioned or resized), which would wrongly inflate the matched
+        # count and show a green tick. Derive it deterministically — same
+        # rationale as recomputing the summary below — rather than trusting the
+        # LLM's boolean.
+        row["match"] = row["match_type"] in ("exact", "semantic")
+
         sim_val = row.get("sim_value")
         real_val = row.get("real_value")
-        if row["match"] is True and (sim_val is None or real_val is None):
+        if row["match"] and (sim_val is None or real_val is None):
             raise ValueError(
-                f"row {i}: cannot have match=true with a null value"
+                f"row {i}: match_type {row['match_type']!r} requires both "
+                f"sim_value and real_value to be non-null"
             )
         if row["match_type"] == "missing_in_real" and real_val is not None:
             raise ValueError(
@@ -498,18 +559,23 @@ def analyze_sim(sim_path: Path, model: str = "claude-sonnet-4-6") -> dict:
 
 def compare_real(
     sim_report: dict,
+    sim_path: Path,
     real_path: Path,
     model: str = "claude-sonnet-4-6",
     max_tokens: int = 8192,
 ) -> dict:
-    """Read real image → call LLM with sim_report → parse → return compare_report.
+    """Read both images → call LLM with sim_report → parse → return compare_report.
 
-    One retry with a corrective hint if parse fails the first time. 8192 covers
-    ~17-20 criteria; products with 30+ criteria may need a higher cap.
+    Sends the mockup AND the real photo so the model compares them visually
+    rather than echoing the sim_report. One retry with a corrective hint if
+    parse fails the first time. 8192 covers ~17-20 criteria; products with 30+
+    criteria may need a higher cap.
     """
-    media_type, b64 = encode_image(real_path)
+    sim_media_type, sim_b64 = encode_image(sim_path)
+    real_media_type, real_b64 = encode_image(real_path)
     system, messages = build_compare_messages(
-        sim_report, b64, media_type, real_path.name
+        sim_report, sim_b64, sim_media_type, real_b64, real_media_type,
+        real_path.name,
     )
     raw = call_llm(system, messages, model=model, max_tokens=max_tokens)
     try:
@@ -558,7 +624,7 @@ def process_pair(
     )
 
     compare_report = compare_real(
-        sim_report, real_path, model=model, max_tokens=max_tokens
+        sim_report, sim_path, real_path, model=model, max_tokens=max_tokens
     )
     compare_report["pair"] = base  # canonical, overrides whatever LLM wrote
     (pair_dir / "compare.json").write_text(
