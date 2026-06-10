@@ -103,7 +103,9 @@ Photoshop output) — colors are flat, edges are clean, no photographic noise.
 ## Strict rules
 
 1. Respond with a SINGLE valid JSON object, no prose before or after.
-2. All field values in English.
+2. All field values in Romanian, EXCEPT `id` which stays snake_case ASCII
+   English (see rule 4). Use natural Romanian for `label`, `value`, `location`,
+   `details`, and the `overall` block.
 3. NEVER invent: if you cannot see something clearly, omit it. Do not write
    "unknown" or guess.
 4. Each criterion `id` must be unique, snake_case, ASCII (e.g. "chest_logo").
@@ -235,7 +237,10 @@ NOT in sim_report (extras).
 ## Strict rules
 
 1. Respond with a SINGLE valid JSON object, no prose.
-2. All field values in English.
+2. All human-readable field values in Romanian (`criterion`, `sim_value`,
+   `real_value`, `note`, `differences`, `details`, `real_overall`). EXCEPTION:
+   keep `match_type` and `confidence` as the exact English enum tokens listed
+   in rules 5-6 — the application matches on them programmatically.
 3. One row per sim criterion (in order), then rows for extras found only on the
    real product.
 4. `match: true` ONLY when both `sim_value` and `real_value` are non-null AND

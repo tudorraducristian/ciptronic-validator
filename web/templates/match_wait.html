@@ -17,7 +17,7 @@
                     <span class="criteria-list__num">{{ loop.index }}</span>
                     <div>
                         <span class="criteria-list__label">{{ c.label }}</span>
-                        <span class="criteria-list__desc">{{ c.description }}</span>
+                        <span class="criteria-list__desc">{{ c.value }}{% if c.location %} · {{ c.location }}{% endif %}</span>
                     </div>
                 </li>
                 {% endfor %}
@@ -27,7 +27,7 @@
         <section class="card">
             <h2 style="font-family: var(--ff-sans); font-size: 18px;">
                 Adaugă poza produsului real
-                <span class="badge badge--info">await real</span>
+                <span class="badge badge--info">așteaptă poza reală</span>
             </h2>
             <p>O singură poză, frontală, cu produsul finit.</p>
 
