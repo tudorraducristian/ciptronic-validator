@@ -3,70 +3,88 @@
 {% block content %}
 <main class="page page--wide">
     <h1>Raport validare</h1>
-    <p style="margin-bottom: var(--s-6);">
-        Total câmpuri raportate: {{ (conform|length) + (neconform|length) + (nevizibil|length) }}.
-    </p>
 
-    <section class="report-zone report-zone--conform">
-        <header class="report-zone__header">
-            <span class="report-zone__icon">✓</span>
-            <h2 class="report-zone__title">Conform</h2>
-            <span class="report-zone__count">{{ conform|length }}</span>
-        </header>
-        {% for item in conform %}
-        <article class="report-item">
-            <div class="report-item__head">
-                <span class="report-item__field">{{ item.camp }}</span>
-                <span class="badge badge--success">încredere: {{ item.incredere }}</span>
-            </div>
-            <dl style="margin: 0;">
-                <div class="report-item__row"><dt>Așteptat</dt><dd>{{ item.valoare_asteptata }}</dd></div>
-                <div class="report-item__row"><dt>Observat</dt><dd>{{ item.valoare_observata }}</dd></div>
-            </dl>
-            <p class="report-item__reason">{{ item.motiv }}</p>
-        </article>
+    {% if image_urls %}
+    <section class="match-compare match-compare--sticky">
+        {% for img in image_urls %}
+        <figure class="match-compare__item">
+            <figcaption class="match-compare__cap">{{ img.label }}</figcaption>
+            <img src="{{ img.url }}" alt="{{ img.label }}">
+        </figure>
         {% endfor %}
     </section>
+    {% endif %}
 
-    <section class="report-zone report-zone--neconform">
-        <header class="report-zone__header">
-            <span class="report-zone__icon">✗</span>
-            <h2 class="report-zone__title">Neconform</h2>
-            <span class="report-zone__count">{{ neconform|length }}</span>
-        </header>
-        {% for item in neconform %}
-        <article class="report-item">
-            <div class="report-item__head">
-                <span class="report-item__field">{{ item.camp }}</span>
-                <span class="badge badge--danger">încredere: {{ item.incredere }}</span>
-            </div>
-            <dl style="margin: 0;">
-                <div class="report-item__row"><dt>Așteptat</dt><dd>{{ item.valoare_asteptata }}</dd></div>
-                <div class="report-item__row"><dt>Observat</dt><dd>{{ item.valoare_observata }}</dd></div>
-            </dl>
-            <p class="report-item__reason">{{ item.motiv }}</p>
-        </article>
-        {% endfor %}
-    </section>
+    <div class="match-summary">
+        <div class="match-summary__chip">
+            <div class="match-summary__chip__label">Total criterii</div>
+            <div class="match-summary__chip__value">{{ (conform|length) + (neconform|length) + (nevizibil|length) }}</div>
+        </div>
+        <div class="match-summary__chip match-summary__chip--match">
+            <div class="match-summary__chip__label">Conform</div>
+            <div class="match-summary__chip__value">{{ conform|length }}</div>
+        </div>
+        <div class="match-summary__chip match-summary__chip--mismatch">
+            <div class="match-summary__chip__label">Neconform</div>
+            <div class="match-summary__chip__value">{{ neconform|length }}</div>
+        </div>
+        <div class="match-summary__chip">
+            <div class="match-summary__chip__label">Nevizibil</div>
+            <div class="match-summary__chip__value">{{ nevizibil|length }}</div>
+        </div>
+    </div>
 
-    <section class="report-zone report-zone--nevizibil">
-        <header class="report-zone__header">
-            <span class="report-zone__icon">?</span>
-            <h2 class="report-zone__title">Nevizibil</h2>
-            <span class="report-zone__count">{{ nevizibil|length }}</span>
-        </header>
-        {% for item in nevizibil %}
-        <article class="report-item">
-            <div class="report-item__head">
-                <span class="report-item__field">{{ item.camp }}</span>
-            </div>
-            <dl style="margin: 0;">
-                <div class="report-item__row"><dt>Așteptat</dt><dd>{{ item.valoare_asteptata }}</dd></div>
-            </dl>
-            <p class="report-item__reason">{{ item.motiv }}</p>
-        </article>
-        {% endfor %}
-    </section>
+    <div class="match-table-wrap">
+        <table class="match-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <th>Criteriu</th>
+                    <th>Așteptat (spec)</th>
+                    <th>Observat (produs)</th>
+                    <th style="width: 120px;">Verdict</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in neconform %}
+                <tr class="is-mismatch">
+                    <td><span class="match-table__icon match-table__icon--bad">✗</span></td>
+                    <td>
+                        <div class="match-table__criterion">{{ item.camp }}</div>
+                        {% if item.motiv %}<div class="match-table__note">{{ item.motiv }}{% if item.incredere %} · încredere: {{ item.incredere }}{% endif %}</div>{% endif %}
+                    </td>
+                    <td class="match-table__value">{{ item.valoare_asteptata or '—' }}</td>
+                    <td class="match-table__value">{{ item.valoare_observata or '—' }}</td>
+                    <td><span class="badge badge--danger">neconform</span></td>
+                </tr>
+            {% endfor %}
+            {% for item in conform %}
+                <tr class="is-match">
+                    <td><span class="match-table__icon match-table__icon--ok">✓</span></td>
+                    <td>
+                        <div class="match-table__criterion">{{ item.camp }}</div>
+                        {% if item.motiv %}<div class="match-table__note">{{ item.motiv }}{% if item.incredere %} · încredere: {{ item.incredere }}{% endif %}</div>{% endif %}
+                    </td>
+                    <td class="match-table__value">{{ item.valoare_asteptata or '—' }}</td>
+                    <td class="match-table__value">{{ item.valoare_observata or '—' }}</td>
+                    <td><span class="badge badge--success">conform</span></td>
+                </tr>
+            {% endfor %}
+            {% for item in nevizibil %}
+                <tr class="is-extra">
+                    <td><span class="match-table__icon match-table__icon--extra">?</span></td>
+                    <td>
+                        <div class="match-table__criterion">{{ item.camp }}</div>
+                        {% if item.motiv %}<div class="match-table__note">{{ item.motiv }}</div>{% endif %}
+                    </td>
+                    <td class="match-table__value">{{ item.valoare_asteptata or '—' }}</td>
+                    <td class="match-table__value">—</td>
+                    <td><span class="badge badge--warn">nevizibil</span></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
     <div class="row-actions" style="margin-top: var(--s-6);">
         <a href="/" class="btn btn--secondary">Începe sesiune nouă</a>

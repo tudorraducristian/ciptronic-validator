@@ -5,49 +5,52 @@
     <h1>Criterii detectate în mockup</h1>
     <p style="margin-bottom: var(--s-5);">
         Sistemul a analizat artwork-ul și a extras
-        <strong>{{ criteria|length }} criterii vizuale</strong>.
+        <strong>{{ criteria|length }} criterii vizuale</strong>. Adaugă poza produsului real ca să le comparăm.
     </p>
 
-    <div class="discovery">
-        <aside class="card">
-            <h2 class="card__title">Criterii extrase</h2>
-            <ol class="criteria-list">
-                {% for c in criteria %}
-                <li>
-                    <span class="criteria-list__num">{{ loop.index }}</span>
-                    <div>
-                        <span class="criteria-list__label">{{ c.label }}</span>
-                        <span class="criteria-list__desc">{{ c.value }}{% if c.location %} · {{ c.location }}{% endif %}</span>
-                    </div>
-                </li>
-                {% endfor %}
-            </ol>
-        </aside>
+    <form action="/matches/{{ match_id }}/real" method="post" enctype="multipart/form-data">
+        <section class="match-wait-top">
+            <figure class="match-mockup">
+                <figcaption class="match-mockup__cap">Mockup</figcaption>
+                <img src="/matches/{{ match_id }}/image/sim" alt="Mockup">
+            </figure>
 
-        <section class="card">
-            <h2 style="font-family: var(--ff-sans); font-size: 18px;">
-                Adaugă poza produsului real
-                <span class="badge badge--info">așteaptă poza reală</span>
-            </h2>
-            <p>O singură poză, frontală, cu produsul finit.</p>
-
-            <form action="/matches/{{ match_id }}/real" method="post" enctype="multipart/form-data">
-                <div class="single-upload">
-                    <span class="single-upload__glyph">▤</span>
-                    <p class="single-upload__title">Trage poza produsului real aici</p>
-                    <p class="single-upload__hint">sau apasă pentru a alege un fișier</p>
-                    <input type="file" name="real" accept="image/*" required>
+            <div class="card match-real-upload">
+                <div class="upload-slot__label">
+                    <span>Adaugă poza produsului real</span>
+                    <span class="badge badge--info">așteaptă poza</span>
                 </div>
-                <div class="row-actions">
-                    <a href="/matches/new" class="btn btn--ghost">
-                        <span aria-hidden="true">←</span> Schimbă mockup-ul
-                    </a>
-                    <button type="submit" class="btn btn--primary btn--lg">
-                        Compară cu mockup-ul <span aria-hidden="true">→</span>
-                    </button>
-                </div>
-            </form>
+                <p class="muted" style="margin: var(--s-1) 0 var(--s-3); font-size: 13px;">
+                    O singură poză, frontală, cu produsul finit.
+                </p>
+                <input type="file" name="real" accept="image/*" required>
+                <img class="upload-slot__img" alt="Previzualizare produs real" hidden>
+            </div>
         </section>
-    </div>
+
+        <div class="row-actions">
+            <a href="/matches/new" class="btn btn--ghost">
+                <span aria-hidden="true">←</span> Schimbă mockup-ul
+            </a>
+            <button type="submit" class="btn btn--primary btn--lg">
+                Compară cu mockup-ul <span aria-hidden="true">→</span>
+            </button>
+        </div>
+    </form>
+
+    <section class="card" style="margin-top: var(--s-6);">
+        <h2 class="card__title">Criterii extrase ({{ criteria|length }})</h2>
+        <ol class="criteria-list">
+            {% for c in criteria %}
+            <li>
+                <span class="criteria-list__num">{{ loop.index }}</span>
+                <div>
+                    <span class="criteria-list__label">{{ c.label }}</span>
+                    <span class="criteria-list__desc">{{ c.value }}{% if c.location %} · {{ c.location }}{% endif %}</span>
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
 </main>
 {% endblock %}

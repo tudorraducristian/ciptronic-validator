@@ -11,7 +11,7 @@
 <main class="page page--wide">
     <h1>Raport comparație</h1>
 
-    <section class="match-compare">
+    <section class="match-compare match-compare--sticky">
         <figure class="match-compare__item">
             <figcaption class="match-compare__cap">Mockup</figcaption>
             <img src="{{ sim_image_url }}" alt="Mockup">
@@ -50,12 +50,10 @@
             </thead>
             <tbody>
             {% for row in rows %}
-                <tr class="{{ 'is-match' if row.match else 'is-mismatch' }}{{ ' is-extra' if row.match_type == 'extra_on_real' else '' }}">
+                <tr class="{{ 'is-match' if row.match else 'is-mismatch' }}">
                     <td>
                         {% if row.match %}
                             <span class="match-table__icon match-table__icon--ok">✓</span>
-                        {% elif row.match_type == 'extra_on_real' %}
-                            <span class="match-table__icon match-table__icon--extra">+</span>
                         {% else %}
                             <span class="match-table__icon match-table__icon--bad">✗</span>
                         {% endif %}
@@ -67,9 +65,7 @@
                     <td class="match-table__value">{{ row.sim_value or '—' }}</td>
                     <td class="match-table__value">{{ row.real_value or '—' }}</td>
                     <td>
-                        {% set badge_class = 'badge--success' if row.match else 'badge--danger' %}
-                        {% if row.match_type == 'extra_on_real' %}{% set badge_class = 'badge--warn' %}{% endif %}
-                        <span class="badge {{ badge_class }}">{{ type_labels.get(row.match_type, row.match_type) }}</span>
+                        <span class="badge {{ 'badge--success' if row.match else 'badge--danger' }}">{{ type_labels.get(row.match_type, row.match_type) }}</span>
                     </td>
                 </tr>
             {% endfor %}

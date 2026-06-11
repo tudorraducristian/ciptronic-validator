@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Ciptronic Product Validator{% endblock %}</title>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=4">
+    <link rel="stylesheet" href="/static/styles.css?v=13">
 </head>
 <body>
     <header class="topbar">
@@ -18,5 +18,28 @@
         </div>
     </header>
     {% block content %}{% endblock %}
+    <script>
+        // Show a preview of any chosen image in the sibling .upload-slot__img.
+        // Delegated so it also covers htmx-swapped content.
+        document.addEventListener('change', function (e) {
+            var input = e.target;
+            if (!input.matches || !input.matches('input[type=file]')) return;
+            var img = input.parentElement && input.parentElement.querySelector('.upload-slot__img');
+            if (!img) return;
+            if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); }
+            var file = input.files && input.files[0];
+            if (file) {
+                var url = URL.createObjectURL(file);
+                img.src = url;
+                img.dataset.url = url;
+                img.hidden = false;
+                var box = input.closest('.upload-slot');
+                if (box) { box.classList.add('upload-slot--filled'); }
+            } else {
+                img.hidden = true;
+                img.removeAttribute('src');
+            }
+        });
+    </script>
 </body>
 </html>

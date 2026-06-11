@@ -516,6 +516,19 @@ a:hover { color: var(--c-accent); }
   color: var(--c-text-soft);
   font-family: ui-monospace, monospace;
 }
+.upload-slot__img {
+  margin-top: var(--s-3);
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  padding: var(--s-2);
+}
+/* Keep the preview truly hidden before upload, even when another rule sets
+   display:block on the image (otherwise a broken-image placeholder shows). */
+.upload-slot__img[hidden] { display: none !important; }
 
 /* ---------- Report — three zones ---------- */
 .report-zone {
@@ -852,7 +865,14 @@ a:hover { color: var(--c-accent); }
 }
 
 /* ---------- Match flow: criteria list (sim_report) ---------- */
-.criteria-list { list-style: none; padding: 0; margin: 0; }
+.criteria-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  column-gap: var(--s-5);
+}
 .criteria-list li {
   display: grid;
   grid-template-columns: 28px 1fr;
@@ -921,6 +941,71 @@ a:hover { color: var(--c-accent); }
 }
 @media (max-width: 560px) {
   .match-compare { grid-template-columns: 1fr; max-width: 320px; }
+}
+
+/* Report: keep the two photos pinned while the user scrolls the criteria. */
+.match-compare--sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--c-bg);
+  padding: var(--s-3) 0;
+  margin: 0 0 var(--s-4);
+  max-width: none;          /* full content width so its bg hides rows scrolling under it */
+}
+.match-compare--sticky .match-compare__item img { max-height: 240px; }
+@media (max-width: 560px) {
+  .match-compare--sticky { position: static; }
+}
+
+/* Wait page: mockup and real-product upload side by side, equal columns. */
+.match-wait-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+  align-items: start;
+  margin-bottom: var(--s-4);
+}
+@media (max-width: 700px) {
+  .match-wait-top { grid-template-columns: 1fr; }
+}
+
+.match-mockup {
+  margin: 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--s-4);
+}
+.match-mockup__cap {
+  font-family: var(--ff-sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-soft);
+  margin: 0 0 var(--s-3);
+}
+.match-mockup img {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 480px;
+  width: auto;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  background: #fff;
+}
+/* Real-product preview matches the mockup size/treatment so the two are equal. */
+.match-real-upload .upload-slot__img {
+  display: block;
+  margin: var(--s-3) auto 0;
+  width: auto;
+  max-width: 100%;
+  max-height: 480px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .match-summary {

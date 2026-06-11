@@ -348,6 +348,21 @@ def _item_to_dict(item) -> dict:
     }
 
 
+@app.get("/reports/{report_id}/image/{idx}")
+def report_image(report_id: str, idx: int):
+    """Serve one of the product photos uploaded for this validation report so
+    the report can pin them while the user reads the criteria. Scoped to the
+    report's own image list."""
+    with get_conn() as conn:
+        row = repository.get_report(conn, report_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Raport inexistent")
+    paths = json.loads(row["image_paths_json"])
+    if idx < 0 or idx >= len(paths) or not Path(paths[idx]).is_file():
+        raise HTTPException(status_code=404, detail="Imagine indisponibilă")
+    return FileResponse(Path(paths[idx]))
+
+
 @app.get("/reports/{report_id}", response_class=HTMLResponse)
 def view_report(report_id: str, request: Request):
     with get_conn() as conn:
@@ -355,6 +370,11 @@ def view_report(report_id: str, request: Request):
         if row is None:
             raise HTTPException(status_code=404, detail="Raport inexistent")
 
+    image_count = len(json.loads(row["image_paths_json"]))
+    image_urls = [
+        {"url": f"/reports/{report_id}/image/{i}", "label": f"Poza {i + 1}"}
+        for i in range(image_count)
+    ]
     return TEMPLATES.TemplateResponse(
         request,
         "report.html",
@@ -363,6 +383,7 @@ def view_report(report_id: str, request: Request):
             "conform": json.loads(row["conform_json"]),
             "neconform": json.loads(row["neconform_json"]),
             "nevizibil": json.loads(row["nevizibil_json"]),
+            "image_urls": image_urls,
         },
     )
 

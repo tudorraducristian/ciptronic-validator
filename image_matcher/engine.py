@@ -731,15 +731,43 @@ def call_llm(
     raise RuntimeError("unreachable")
 
 
-def analyze_sim(sim_path: Path, model: str = "claude-sonnet-4-6") -> dict:
-    """Read sim image → call LLM → parse → return validated sim_report."""
+def analyze_sim(
+    sim_path: Path, model: str = "claude-sonnet-4-6", max_tokens: int = 6144
+) -> dict:
+    """Read sim image → call LLM → parse → return validated sim_report.
+
+    One retry with a corrective hint if the first response is not valid JSON or
+    fails validation — the vision model occasionally emits a stray/ missing
+    comma or a truncated object, and a single retry reliably recovers it (same
+    pattern as compare_real)."""
     media_type, b64 = encode_image(sim_path)
     system, messages = build_sim_messages(b64, media_type, sim_path.name)
-    raw = call_llm(system, messages, model=model)
+    raw = call_llm(system, messages, model=model, max_tokens=max_tokens)
     try:
         report = parse_sim_response(raw)
-    except ValueError as e:
-        raise ValueError(f"sim parse failed for {sim_path.name}: {e}") from e
+    except ValueError as first_error:
+        logger.warning(
+            "sim parse failed for %s: %s — retrying with hint",
+            sim_path.name, first_error,
+        )
+        retry_messages = [
+            *messages,
+            {"role": "assistant", "content": raw},
+            {
+                "role": "user",
+                "content": (
+                    f"Your previous response had this problem: {first_error}. "
+                    f"Return ONLY a single valid JSON object exactly as the "
+                    f"system prompt describes — double-check every comma and "
+                    f"closing brace."
+                ),
+            },
+        ]
+        raw = call_llm(system, retry_messages, model=model, max_tokens=max_tokens)
+        try:
+            report = parse_sim_response(raw)
+        except ValueError as e:
+            raise ValueError(f"sim parse failed for {sim_path.name}: {e}") from e
     # Ensure the report carries the actual filename even if the LLM dropped it.
     report["source_image"] = sim_path.name
     return report
