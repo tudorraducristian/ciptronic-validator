@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block topbar_meta %}Eroare {{ status_code }}{% endblock %}
+{% block content %}
+<main class="page page--narrow">
+    <h1>A apărut o problemă</h1>
+    <div class="callout" role="alert" style="border-left-color: var(--c-danger); background: var(--c-danger-soft); color: var(--c-danger-ink);">
+        <strong>Eroare {{ status_code }}.</strong> {{ detail }}
+    </div>
+    <div class="row-actions">
+        <a href="/" class="btn btn--ghost"><span aria-hidden="true">←</span> Înapoi la început</a>
+    </div>
+</main>
+{% endblock %}

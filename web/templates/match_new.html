@@ -7,6 +7,12 @@
         Sistemul va extrage automat criteriile vizuale și le va compara cu poza produsului real.
     </p>
 
+    {% if error %}
+    <div class="callout" role="alert" style="margin-bottom: var(--s-5); border-left-color: var(--c-danger); background: var(--c-danger-soft); color: var(--c-danger-ink);">
+        {{ error }}
+    </div>
+    {% endif %}
+
     <div class="callout" style="margin-bottom: var(--s-5);">
         <strong>Acceptăm:</strong> JPG, PNG, WEBP · max <strong>5 MB</strong>.
     </div>

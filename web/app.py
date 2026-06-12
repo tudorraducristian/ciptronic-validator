@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import sqlite3
@@ -7,9 +8,11 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from PIL import Image, ImageChops
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # Load .env so ANTHROPIC_API_KEY is available even when the app is imported
 # directly (uvicorn web.app:app, tests) without going through main.py.
@@ -46,6 +49,21 @@ def get_llm_client() -> Any:
 
 app = FastAPI(title="Ciptronic Product Validator")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Browsers (Accept: text/html) get a friendly error page instead of the raw
+    JSON {"detail": ...}; API clients and tests (Accept: */*) keep the JSON. The
+    status code is preserved either way."""
+    if "text/html" in request.headers.get("accept", ""):
+        return TEMPLATES.TemplateResponse(
+            request,
+            "error.html",
+            {"status_code": exc.status_code, "detail": exc.detail},
+            status_code=exc.status_code,
+        )
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
 def init_database() -> None:
@@ -430,6 +448,24 @@ def view_match(match_id: str, request: Request):
         if row is None:
             raise HTTPException(status_code=404, detail="Match inexistent")
 
+    status = row["status"]
+    if status == "complete":
+        # Already compared — send the user to the report instead of re-rendering
+        # the upload form. Re-showing it after a back/refresh/double-submit lets
+        # them POST to /real again and hit the 'awaiting_real' guard with a
+        # confusing 409 ("Match nu așteaptă poză reală").
+        return Response(
+            status_code=303, headers={"Location": f"/matches/{match_id}/report"}
+        )
+    if status == "failed":
+        # The match can no longer accept a photo; offer a clean restart rather
+        # than a dead upload form that would also 409 on submit.
+        return TEMPLATES.TemplateResponse(
+            request,
+            "match_new.html",
+            {"error": "Comparația anterioară a eșuat. Încarcă din nou mockup-ul pentru a relua."},
+        )
+
     sim_report = json.loads(row["sim_report_json"])
     criteria = sim_report.get("criteria", [])
 
@@ -477,11 +513,52 @@ async def upload_match_real(match_id: str, real: UploadFile = File(...)):
     return Response(status_code=303, headers={"Location": f"/matches/{match_id}/report"})
 
 
+def _trim_solid_border(data: bytes, *, tolerance: int = 30, max_trim: float = 0.2) -> bytes | None:
+    """If the image has a uniform solid-colour frame (e.g. a screenshot exported
+    on a dark background), return PNG bytes with that frame cropped off.
+
+    Returns None — meaning "serve the original untouched" — when there is no
+    clear frame, when the bytes aren't a readable image, when the image is a
+    single flat colour, or when cropping would remove more than `max_trim` of
+    either dimension (a guard against eating real product content). Pure and
+    display-only: never mutates the stored file."""
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.load()
+    except Exception:
+        return None
+    rgb = im.convert("RGB")
+    w, h = rgb.size
+    if w < 8 or h < 8:
+        return None
+    corners = [rgb.getpixel((0, 0)), rgb.getpixel((w - 1, 0)),
+               rgb.getpixel((0, h - 1)), rgb.getpixel((w - 1, h - 1))]
+    base = corners[0]
+    # Only treat it as a frame when all four corners share (near) one colour.
+    if any(abs(a - b) > tolerance for c in corners[1:] for a, b in zip(base, c)):
+        return None
+    diff = ImageChops.difference(rgb, Image.new("RGB", rgb.size, base))
+    mask = diff.convert("L").point(lambda p: 255 if p > tolerance else 0)
+    bbox = mask.getbbox()
+    if bbox is None:
+        return None  # image is entirely the frame colour — leave it alone
+    left, top, right, bottom = bbox
+    if left == 0 and top == 0 and right == w and bottom == h:
+        return None  # nothing to trim
+    if (left > w * max_trim or (w - right) > w * max_trim or
+            top > h * max_trim or (h - bottom) > h * max_trim):
+        return None  # would crop too aggressively — likely not a frame
+    out = io.BytesIO()
+    rgb.crop(bbox).save(out, format="PNG")
+    return out.getvalue()
+
+
 @app.get("/matches/{match_id}/image/{kind}")
 def match_image(match_id: str, kind: str):
     """Serve a match's stored mockup or real photo so the report can show them
     side by side. Scoped to the two known image slots — never exposes the
-    wider uploads directory."""
+    wider uploads directory. A uniform solid-colour frame (e.g. a navy export
+    background) is trimmed for display only; the stored file is untouched."""
     if kind not in ("sim", "real"):
         raise HTTPException(status_code=404, detail="Imagine inexistentă")
     with get_conn() as conn:
@@ -491,7 +568,11 @@ def match_image(match_id: str, kind: str):
     path_str = row["sim_image_path"] if kind == "sim" else row["real_image_path"]
     if not path_str or not Path(path_str).is_file():
         raise HTTPException(status_code=404, detail="Imagine indisponibilă")
-    return FileResponse(Path(path_str))
+    path = Path(path_str)
+    trimmed = _trim_solid_border(path.read_bytes())
+    if trimmed is not None:
+        return Response(content=trimmed, media_type="image/png")
+    return FileResponse(path)
 
 
 @app.get("/matches/{match_id}/report", response_class=HTMLResponse)

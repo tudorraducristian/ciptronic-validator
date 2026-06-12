@@ -252,3 +252,87 @@ def test_match_report_shows_rows_table(client, fake_image_engine):
     assert "Color" in r.text
     assert "navy" in r.text
     assert "exact" in r.text
+
+
+def test_get_completed_match_redirects_to_report(client, fake_image_engine):
+    """Revisiting a finished match (back button, refresh, double-submit) must NOT
+    re-show the real-photo upload form. Doing so lets the user POST to an
+    already-complete match, which the status guard rejects with a confusing 409.
+    A completed match should redirect to its report instead."""
+    fake_image_engine.sim_response = {"criteria": [{"id": "c1", "label": "Color", "description": "x"}]}
+    fake_image_engine.compare_response = {
+        "rows": [{"criterion": "Color", "sim_value": "navy", "real_value": "navy",
+                  "match": True, "match_type": "exact", "confidence": "high", "note": ""}],
+        "summary": {"matched": 1, "mismatched": 0, "total": 1},
+    }
+    files = {"sim": ("m.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    match_id = client.post("/matches", files=files, follow_redirects=False).headers["Location"].rsplit("/", 1)[-1]
+    files = {"real": ("r.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    client.post(f"/matches/{match_id}/real", files=files, follow_redirects=False)
+
+    # Match is now 'complete' — revisiting it must redirect to the report,
+    # never re-render the upload form (which would invite a 409 on re-submit).
+    r = client.get(f"/matches/{match_id}", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"] == f"/matches/{match_id}/report"
+
+
+def test_errors_render_html_for_browsers_json_for_api(client):
+    """A browser (Accept: text/html) gets a friendly HTML error page instead of
+    the raw JSON {"detail": ...}; API clients keep JSON. Status is preserved."""
+    r = client.get("/matches/does-not-exist", headers={"accept": "text/html"})
+    assert r.status_code == 404
+    assert "text/html" in r.headers["content-type"]
+    assert "A apărut o problemă" in r.text
+    assert "Match inexistent" in r.text
+
+    r = client.get("/matches/does-not-exist")  # TestClient default Accept: */*
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Match inexistent"
+
+
+def test_failed_match_offers_restart_not_dead_form(client, fake_image_engine, monkeypatch):
+    """A match whose comparison failed can never accept a photo again; revisiting
+    it must offer a clean restart (match_new + message), not the dead upload form
+    that would also 409 on submit."""
+    fake_image_engine.sim_response = {"criteria": [{"id": "c1", "label": "Color", "description": "x"}]}
+    files = {"sim": ("m.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    match_id = client.post("/matches", files=files, follow_redirects=False).headers["Location"].rsplit("/", 1)[-1]
+
+    from web import app as web_app
+    monkeypatch.setattr(web_app, "compare_real", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("vision down")))
+    files = {"real": ("r.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    r = client.post(f"/matches/{match_id}/real", files=files, follow_redirects=False)
+    assert r.status_code == 502  # match flipped to 'failed'
+
+    r = client.get(f"/matches/{match_id}", headers={"accept": "text/html"}, follow_redirects=False)
+    assert r.status_code == 200
+    assert "Încarcă mockup" in r.text   # match_new page, not the upload form
+    assert "a eșuat" in r.text          # friendly restart message
+    assert 'name="real"' not in r.text  # no dead real-photo form
+
+
+def test_match_image_trims_solid_navy_border(client, fake_image_engine):
+    """The report's image route strips a uniform solid-colour frame (e.g. a
+    screenshot exported on a navy background) for display, without altering the
+    stored upload."""
+    from PIL import Image as _Image
+    im = _Image.new("RGB", (120, 120), (255, 255, 255))
+    for x in list(range(12)) + list(range(108, 120)):
+        for y in range(120):
+            im.putpixel((x, y), (30, 41, 59))  # 12px navy bars left/right
+    for x in range(40, 80):
+        for y in range(50, 70):
+            im.putpixel((x, y), (200, 50, 20))  # interior content
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    buf.seek(0)
+
+    fake_image_engine.sim_response = {"criteria": [{"id": "c1", "label": "X", "description": "y"}]}
+    files = {"sim": ("m.png", buf, "image/png")}
+    match_id = client.post("/matches", files=files, follow_redirects=False).headers["Location"].rsplit("/", 1)[-1]
+
+    r = client.get(f"/matches/{match_id}/image/sim")
+    assert r.status_code == 200
+    served = _Image.open(io.BytesIO(r.content))
+    assert served.width == 96  # 12px navy trimmed from each side (120 - 24)

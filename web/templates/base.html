@@ -40,6 +40,22 @@
                 img.removeAttribute('src');
             }
         });
+
+        // Block double-submit on the slow LLM forms (analyze_sim ~10s,
+        // compare_real ~15s): lock the submit button once the form is on its
+        // way. Skip HTMX-driven forms — HTMX manages its own request lifecycle.
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            if (!form || form.tagName !== 'FORM') return;
+            if (form.hasAttribute('hx-post') || form.hasAttribute('hx-get') ||
+                form.querySelector('[hx-post],[hx-get]')) return;
+            var btn = form.querySelector('button[type=submit], button:not([type])');
+            if (!btn || btn.disabled) return;
+            btn.textContent = 'Se procesează…';
+            // Disable after the native submission is dispatched, so the form
+            // still posts normally.
+            setTimeout(function () { btn.disabled = true; }, 0);
+        });
     </script>
 </body>
 </html>
