@@ -95,6 +95,16 @@ def get_match_session(conn: sqlite3.Connection, match_id: str) -> sqlite3.Row | 
     return cur.fetchone()
 
 
+def update_match_sim(conn: sqlite3.Connection, match_id: str,
+                     sim_image_path: str, sim_report: dict) -> None:
+    """Replace the mockup image + its extracted criteria (status unchanged)."""
+    conn.execute(
+        "UPDATE match_sessions SET sim_image_path = ?, sim_report_json = ? WHERE id = ?",
+        (sim_image_path, json.dumps(sim_report, ensure_ascii=False), match_id),
+    )
+    conn.commit()
+
+
 def update_match_compare_report(conn: sqlite3.Connection, match_id: str,
                                 real_image_path: str, compare_report: dict) -> None:
     conn.execute(

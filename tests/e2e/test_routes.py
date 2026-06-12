@@ -336,3 +336,88 @@ def test_match_image_trims_solid_navy_border(client, fake_image_engine):
     assert r.status_code == 200
     served = _Image.open(io.BytesIO(r.content))
     assert served.width == 96  # 12px navy trimmed from each side (120 - 24)
+
+
+def _complete_match(client, fake_image_engine):
+    """Create a match and run it through to a complete comparison; return its id."""
+    fake_image_engine.sim_response = {"criteria": [{"id": "c1", "label": "Color", "description": "x"}]}
+    fake_image_engine.compare_response = {
+        "rows": [{"criterion": "Color", "sim_value": "navy", "real_value": "navy",
+                  "match": True, "match_type": "exact", "confidence": "high", "note": ""}],
+        "summary": {"matched": 1, "mismatched": 0, "total": 1},
+    }
+    files = {"sim": ("m.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    mid = client.post("/matches", files=files, follow_redirects=False).headers["Location"].rsplit("/", 1)[-1]
+    files = {"real": ("r.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    client.post(f"/matches/{mid}/real", files=files, follow_redirects=False)
+    return mid
+
+
+def test_replace_real_on_complete_recompares_and_updates_table(client, fake_image_engine):
+    mid = _complete_match(client, fake_image_engine)
+    assert len(fake_image_engine.compare_calls) == 1
+
+    fake_image_engine.compare_response = {
+        "rows": [{"criterion": "Color", "sim_value": "navy", "real_value": "RED",
+                  "match": False, "match_type": "partial", "confidence": "high", "note": "diff"}],
+        "summary": {"matched": 0, "mismatched": 1, "total": 1},
+    }
+    files = {"real": ("r2.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    r = client.post(f"/matches/{mid}/real", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"] == f"/matches/{mid}/report"
+    assert len(fake_image_engine.compare_calls) == 2  # re-compared
+    assert len(fake_image_engine.analyze_calls) == 1  # mockup NOT re-analyzed
+    rep = client.get(f"/matches/{mid}/report")
+    assert "RED" in rep.text
+
+
+def test_replace_sim_on_complete_reanalyzes_and_recompares(client, fake_image_engine):
+    mid = _complete_match(client, fake_image_engine)
+    assert len(fake_image_engine.analyze_calls) == 1 and len(fake_image_engine.compare_calls) == 1
+
+    fake_image_engine.sim_response = {"criteria": [
+        {"id": "c1", "label": "Logo", "description": "z"},
+        {"id": "c2", "label": "Size", "description": "L"},
+    ]}
+    files = {"sim": ("m2.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    r = client.post(f"/matches/{mid}/sim", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"] == f"/matches/{mid}/report"
+    assert len(fake_image_engine.analyze_calls) == 2  # re-analyzed
+    assert len(fake_image_engine.compare_calls) == 2  # re-compared with existing real
+
+
+def test_replace_sim_on_awaiting_real_reanalyzes_only(client, fake_image_engine):
+    fake_image_engine.sim_response = {"criteria": [{"id": "c1", "label": "Color", "description": "x"}]}
+    files = {"sim": ("m.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    mid = client.post("/matches", files=files, follow_redirects=False).headers["Location"].rsplit("/", 1)[-1]
+    assert len(fake_image_engine.analyze_calls) == 1
+
+    fake_image_engine.sim_response = {"criteria": [
+        {"id": "c1", "label": "Logo", "description": "z"},
+        {"id": "c2", "label": "Size", "description": "L"},
+    ]}
+    files = {"sim": ("m2.png", io.BytesIO(_tiny_jpeg_bytes()), "image/png")}
+    r = client.post(f"/matches/{mid}/sim", files=files, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["Location"] == f"/matches/{mid}"  # stays on match_wait
+    assert len(fake_image_engine.analyze_calls) == 2
+    assert len(fake_image_engine.compare_calls) == 0  # no real photo yet
+    page = client.get(f"/matches/{mid}")
+    assert "Logo" in page.text and "Size" in page.text
+
+
+def test_replace_failure_preserves_existing_report(client, fake_image_engine, monkeypatch):
+    mid = _complete_match(client, fake_image_engine)
+
+    from web import app as web_app
+    monkeypatch.setattr(web_app, "compare_real",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("vision down")))
+    files = {"real": ("r2.jpg", io.BytesIO(_tiny_jpeg_bytes()), "image/jpeg")}
+    r = client.post(f"/matches/{mid}/real", files=files, follow_redirects=False)
+    assert r.status_code == 502
+    # Old report must survive: still complete, still reachable, original data intact.
+    rep = client.get(f"/matches/{mid}/report")
+    assert rep.status_code == 200
+    assert "navy" in rep.text

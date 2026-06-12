@@ -411,6 +411,13 @@ def match_new(request: Request):
     return TEMPLATES.TemplateResponse(request, "match_new.html")
 
 
+def _upload_ext(upload: UploadFile) -> str:
+    """Pick a file extension from the upload's declared type/filename."""
+    if upload.filename and upload.filename.lower().endswith(".webp"):
+        return ".webp"
+    return ".png" if upload.content_type == "image/png" else ".jpg"
+
+
 @app.post("/matches")
 async def create_match(sim: UploadFile = File(...)):
     content = await sim.read()
@@ -422,10 +429,7 @@ async def create_match(sim: UploadFile = File(...)):
     match_uploads = UPLOADS_DIR / "match" / match_id_prefix
     match_uploads.mkdir(parents=True, exist_ok=True)
 
-    ext = ".png" if sim.content_type == "image/png" else ".jpg"
-    if sim.filename and sim.filename.lower().endswith(".webp"):
-        ext = ".webp"
-    sim_path = match_uploads / f"sim{ext}"
+    sim_path = match_uploads / f"sim{_upload_ext(sim)}"
     sim_path.write_bytes(content)
 
     try:
@@ -478,11 +482,15 @@ def view_match(match_id: str, request: Request):
 
 @app.post("/matches/{match_id}/real")
 async def upload_match_real(match_id: str, real: UploadFile = File(...)):
+    """Upload the real product photo (first time) or replace it on a finished
+    match. Either way the mockup criteria are re-compared against the new photo.
+    The new image is staged to a temp file so a failed comparison never destroys
+    an existing report."""
     with get_conn() as conn:
         row = repository.get_match_session(conn, match_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Match inexistent")
-        if row["status"] != "awaiting_real":
+        if row["status"] not in ("awaiting_real", "complete"):
             raise HTTPException(status_code=409, detail="Match nu așteaptă poză reală")
 
         content = await real.read()
@@ -491,26 +499,79 @@ async def upload_match_real(match_id: str, real: UploadFile = File(...)):
 
         sim_path = Path(row["sim_image_path"])
         match_dir = sim_path.parent
-        ext = ".png" if real.content_type == "image/png" else ".jpg"
-        if real.filename and real.filename.lower().endswith(".webp"):
-            ext = ".webp"
-        real_path = match_dir / f"real{ext}"
-        real_path.write_bytes(content)
+        ext = _upload_ext(real)
+        staged = match_dir / f"real_new{ext}"
+        staged.write_bytes(content)
 
         sim_report = json.loads(row["sim_report_json"])
         try:
-            compare_report = compare_real(
-                sim_report, sim_path, real_path, max_tokens=8192
-            )
+            compare_report = compare_real(sim_report, sim_path, staged, max_tokens=8192)
         except Exception as e:
-            repository.fail_match_session(conn, match_id)
+            staged.unlink(missing_ok=True)
+            # First upload failing → mark failed (view_match offers a restart).
+            # Replacing on an already-complete match → keep the old report intact.
+            if row["status"] == "awaiting_real":
+                repository.fail_match_session(conn, match_id)
             raise HTTPException(status_code=502, detail=f"compare_real a eșuat: {e}")
 
+        real_path = match_dir / f"real{ext}"
+        staged.replace(real_path)
+        old_real = row["real_image_path"]
+        if old_real and str(real_path) != old_real:
+            Path(old_real).unlink(missing_ok=True)
         repository.update_match_compare_report(
             conn, match_id, real_image_path=str(real_path), compare_report=compare_report,
         )
 
     return Response(status_code=303, headers={"Location": f"/matches/{match_id}/report"})
+
+
+@app.post("/matches/{match_id}/sim")
+async def replace_match_sim(match_id: str, sim: UploadFile = File(...)):
+    """Replace the mockup and re-extract its criteria. If the match already has a
+    real photo (status complete), the new criteria are also re-compared against
+    it so the report table stays in sync. The new mockup is staged to a temp file
+    so a failed re-analysis leaves the existing match untouched."""
+    with get_conn() as conn:
+        row = repository.get_match_session(conn, match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Match inexistent")
+        if row["status"] not in ("awaiting_real", "complete"):
+            raise HTTPException(status_code=409, detail="Match nu poate fi modificat")
+
+        content = await sim.read()
+        if len(content) > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Mockup-ul depășește 5MB")
+
+        match_dir = Path(row["sim_image_path"]).parent
+        ext = _upload_ext(sim)
+        staged = match_dir / f"sim_new{ext}"
+        staged.write_bytes(content)
+
+        real_str = row["real_image_path"]
+        recompare = row["status"] == "complete" and bool(real_str)
+        try:
+            new_sim_report = analyze_sim(staged)
+            new_compare = (
+                compare_real(new_sim_report, staged, Path(real_str), max_tokens=8192)
+                if recompare else None
+            )
+        except Exception as e:
+            staged.unlink(missing_ok=True)
+            raise HTTPException(status_code=502, detail=f"Re-analiza mockup-ului a eșuat: {e}")
+
+        new_sim_path = match_dir / f"sim{ext}"
+        staged.replace(new_sim_path)
+        if str(new_sim_path) != row["sim_image_path"]:
+            Path(row["sim_image_path"]).unlink(missing_ok=True)
+        repository.update_match_sim(conn, match_id, str(new_sim_path), new_sim_report)
+        if new_compare is not None:
+            repository.update_match_compare_report(
+                conn, match_id, real_image_path=real_str, compare_report=new_compare,
+            )
+
+    target = f"/matches/{match_id}/report" if recompare else f"/matches/{match_id}"
+    return Response(status_code=303, headers={"Location": target})
 
 
 def _trim_solid_border(data: bytes, *, tolerance: int = 30, max_trim: float = 0.2) -> bytes | None:

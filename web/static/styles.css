@@ -958,6 +958,40 @@ a:hover { color: var(--c-accent); }
   .match-compare--sticky { position: static; }
 }
 
+/* "Schimbă poza" control under each compared image */
+.change-photo { margin-top: var(--s-3); text-align: center; }
+.change-photo .btn { width: 100%; cursor: pointer; }
+.change-photo label.btn { cursor: pointer; }
+.is-busy { opacity: 0.6; pointer-events: none; }
+
+/* match_wait: wider two-up, top-aligned so the images line up */
+.match-compare--wait { max-width: 760px; align-items: start; }
+.match-compare--wait .match-compare__item { display: flex; flex-direction: column; }
+
+/* match_wait real card: upload prompt → aligned preview after selection */
+.match-real-card .real-prompt { text-align: center; padding: var(--s-4) 0; }
+.match-real-card__img {
+  display: none;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: var(--r-md);
+}
+.match-real-card.is-filled .real-prompt { display: none; }
+.match-real-card.is-filled .match-real-card__img { display: block; }
+.match-real-card .change-photo { display: none; }
+.match-real-card.is-filled .change-photo { display: block; }
+.match-real-card__submit { width: 100%; margin-top: auto; }
+
+/* "Compară" acts on both images → centred below the pair, with a clear gap
+   so it reads as a separate action. */
+.match-compare-action {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--s-6);
+}
+
 /* Wait page: mockup and real-product upload side by side, equal columns. */
 .match-wait-top {
   display: grid;

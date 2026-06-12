@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Ciptronic Product Validator{% endblock %}</title>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <link rel="stylesheet" href="/static/styles.css?v=13">
+    <link rel="stylesheet" href="/static/styles.css?v=15">
 </head>
 <body>
     <header class="topbar">
@@ -19,26 +19,142 @@
     </header>
     {% block content %}{% endblock %}
     <script>
-        // Show a preview of any chosen image in the sibling .upload-slot__img.
-        // Delegated so it also covers htmx-swapped content.
+        // Crop a uniform solid-colour frame from a loaded <img>. Mirrors the
+        // server-side _trim_solid_border so previews match the report. Returns a
+        // PNG dataURL, or null when there is no clear frame / cropping would be
+        // too aggressive (caller then keeps the original).
+        function trimToDataURL(img) {
+            var w = img.naturalWidth, h = img.naturalHeight, tol = 30, maxTrim = 0.2;
+            if (!w || !h) return null;
+            var c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            var ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            var data;
+            try { data = ctx.getImageData(0, 0, w, h).data; } catch (err) { return null; }
+            function px(x, y) { var i = (y * w + x) * 4; return [data[i], data[i + 1], data[i + 2]]; }
+            function close(a, b) {
+                return Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
+            }
+            var base = px(0, 0);
+            if (!(close(base, px(w - 1, 0)) && close(base, px(0, h - 1)) && close(base, px(w - 1, h - 1)))) return null;
+            function differs(x, y) { return !close(px(x, y), base); }
+            var left = w, right = -1, top = h, bottom = -1;
+            var step = Math.max(1, Math.floor(Math.min(w, h) / 400));
+            for (var y = 0; y < h; y += step) {
+                for (var x = 0; x < w; x += step) {
+                    if (differs(x, y)) {
+                        if (x < left) left = x; if (x > right) right = x;
+                        if (y < top) top = y; if (y > bottom) bottom = y;
+                    }
+                }
+            }
+            if (right < 0) return null;                       // entirely the frame colour
+            left = Math.max(0, left - step); top = Math.max(0, top - step);
+            right = Math.min(w - 1, right + step); bottom = Math.min(h - 1, bottom + step);
+            var cw = right - left + 1, ch = bottom - top + 1;
+            if (cw >= w && ch >= h) return null;              // nothing to trim
+            if (left > w * maxTrim || (w - right - 1) > w * maxTrim ||
+                top > h * maxTrim || (h - bottom - 1) > h * maxTrim) return null;
+            var oc = document.createElement('canvas');
+            oc.width = cw; oc.height = ch;
+            oc.getContext('2d').drawImage(c, left, top, cw, ch, 0, 0, cw, ch);
+            return oc.toDataURL('image/png');
+        }
+
+        // While a slow LLM action is in flight (the page will reload when it
+        // finishes), lock every other action on the page so the user can't, e.g.,
+        // hit "Compară" while the mockup is being re-analysed. `except` is the
+        // control that is itself submitting and must stay alive.
+        function lockActions(except) {
+            document.querySelectorAll('button[type=submit], button:not([type]), [data-real-reselect]')
+                .forEach(function (b) { if (b !== except) b.disabled = true; });
+            document.querySelectorAll('input[type=file][data-autosubmit]').forEach(function (inp) {
+                if (inp !== except) {
+                    inp.disabled = true;
+                    var lab = inp.closest('label'); if (lab) lab.classList.add('is-busy');
+                }
+            });
+        }
+
+        // Preview a chosen image (border-trimmed) into the target <img>:
+        // input[data-preview="<imgId>"], the displayed image of a "Schimbă poza"
+        // (data-autosubmit) control, else the sibling .upload-slot__img.
+        function previewFor(input) {
+            if (input.dataset.preview) return document.getElementById(input.dataset.preview);
+            if (input.hasAttribute('data-autosubmit')) {
+                var fig = input.closest('.match-compare__item');
+                return fig ? fig.querySelector('img') : null;
+            }
+            return input.parentElement && input.parentElement.querySelector('.upload-slot__img');
+        }
+
+        // Submit a "Schimbă poza" form (full reload runs the LLM). Shows a busy
+        // label and freezes the other actions until the page reloads.
+        function triggerAutosubmit(input) {
+            var label = input.closest('label');
+            if (label) {
+                for (var i = 0; i < label.childNodes.length; i++) {
+                    var n = label.childNodes[i];
+                    if (n.nodeType === 3 && n.textContent.trim()) {
+                        n.textContent = (input.dataset.busy || 'Se procesează…') + ' ';
+                        break;
+                    }
+                }
+                label.classList.add('is-busy');
+            }
+            lockActions(input);   // freeze "Compară" + other change controls
+            input.form.submit();
+        }
+
         document.addEventListener('change', function (e) {
             var input = e.target;
             if (!input.matches || !input.matches('input[type=file]')) return;
-            var img = input.parentElement && input.parentElement.querySelector('.upload-slot__img');
-            if (!img) return;
-            if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); }
             var file = input.files && input.files[0];
-            if (file) {
-                var url = URL.createObjectURL(file);
-                img.src = url;
-                img.dataset.url = url;
-                img.hidden = false;
-                var box = input.closest('.upload-slot');
-                if (box) { box.classList.add('upload-slot--filled'); }
-            } else {
-                img.hidden = true;
-                img.removeAttribute('src');
+            var img = previewFor(input);
+            var isAuto = input.hasAttribute('data-autosubmit');
+
+            // Runs once the new image is on screen — so a "Schimbă poza" shows the
+            // chosen photo first, THEN kicks off the (slow) re-analysis.
+            function afterShown() {
+                if (file && input.hasAttribute('data-reveal-card')) {
+                    var card = input.closest('.match-real-card');
+                    if (card) { card.classList.add('is-filled'); }
+                }
+                if (file && isAuto && input.form) { triggerAutosubmit(input); }
             }
+
+            if (img && file) {
+                if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); img.dataset.url = ''; }
+                var url = URL.createObjectURL(file);
+                var probe = new Image();
+                probe.onload = function () {
+                    var trimmed = trimToDataURL(probe);
+                    img.src = trimmed || url;
+                    img.hidden = false;
+                    if (trimmed) { URL.revokeObjectURL(url); } else { img.dataset.url = url; }
+                    var slot = input.closest('.upload-slot');
+                    if (slot) { slot.classList.add('upload-slot--filled'); }
+                    afterShown();
+                };
+                probe.onerror = function () {
+                    img.src = url; img.dataset.url = url; img.hidden = false; afterShown();
+                };
+                probe.src = url;
+            } else if (img && !file) {
+                img.hidden = true; img.removeAttribute('src');
+            } else {
+                afterShown();   // no preview target — proceed (e.g. autosubmit fallback)
+            }
+        });
+
+        // "Schimbă poza" on the match_wait real card re-opens the file picker.
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest && e.target.closest('[data-real-reselect]');
+            if (!btn) return;
+            var card = btn.closest('.match-real-card');
+            var input = card && card.querySelector('input[type=file][name=real]');
+            if (input) input.click();
         });
 
         // Block double-submit on the slow LLM forms (analyze_sim ~10s,
@@ -50,8 +166,12 @@
             if (form.hasAttribute('hx-post') || form.hasAttribute('hx-get') ||
                 form.querySelector('[hx-post],[hx-get]')) return;
             var btn = form.querySelector('button[type=submit], button:not([type])');
+            if (!btn && form.id) {  // submit button placed outside via form="<id>"
+                btn = document.querySelector('button[type=submit][form="' + form.id + '"]');
+            }
             if (!btn || btn.disabled) return;
             btn.textContent = 'Se procesează…';
+            lockActions(btn);   // freeze the "Schimbă poza" controls too
             // Disable after the native submission is dispatched, so the form
             // still posts normally.
             setTimeout(function () { btn.disabled = true; }, 0);

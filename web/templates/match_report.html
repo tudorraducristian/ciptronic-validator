@@ -15,10 +15,24 @@
         <figure class="match-compare__item">
             <figcaption class="match-compare__cap">Mockup</figcaption>
             <img src="{{ sim_image_url }}" alt="Mockup">
+            <form action="/matches/{{ match_id }}/sim" method="post" enctype="multipart/form-data" class="change-photo">
+                <label class="btn btn--ghost">
+                    Schimbă poza
+                    <input type="file" name="sim" accept="image/*" hidden
+                           data-autosubmit data-busy="Se reanalizează…">
+                </label>
+            </form>
         </figure>
         <figure class="match-compare__item">
             <figcaption class="match-compare__cap">Produs real</figcaption>
             <img src="{{ real_image_url }}" alt="Produs real">
+            <form action="/matches/{{ match_id }}/real" method="post" enctype="multipart/form-data" class="change-photo">
+                <label class="btn btn--ghost">
+                    Schimbă poza
+                    <input type="file" name="real" accept="image/*" hidden
+                           data-autosubmit data-busy="Se recompară…">
+                </label>
+            </form>
         </figure>
     </section>
 
