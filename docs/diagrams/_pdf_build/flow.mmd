@@ -1,0 +1,38 @@
+flowchart TD
+    Start([Utilizator]) --> Landing["GET / — landing<br/>Două cards"]
+    Landing -->|"Am o descriere"| A0
+    Landing -->|"Am un mockup"| B0
+
+    subgraph FLOW_A["FLUX A — Discovery + Inspector (text)"]
+        A0["GET /sessions/new<br/>dropdown tip produs + textarea"] --> A1
+        A1["POST /sessions<br/>load_schema → empty_state<br/>discovery LLM (runda 1)"] --> A2
+        A2["GET /sessions/{id}<br/>stare câmpuri + întrebări"] --> A3{done &<br/>schema completă?}
+        A3 -->|nu| A4["POST /sessions/{id}/answer<br/>merge_answers → discovery LLM<br/>HTMX swap rundă nouă"]
+        A4 --> A5{rundă > 5?}
+        A5 -->|da| A6["finalize forțat"]
+        A5 -->|nu| A3
+        A3 -->|da| A7["buton: Validează cu poze"]
+        A6 --> A7
+        A7 --> A8["GET /sessions/{id}/validate<br/>spec JSON + upload 1-4 poze"]
+        A8 --> A9["POST /sessions/{id}/validate<br/>inspector VISION LLM<br/>parse_report → save_report"]
+        A9 --> A10["GET /reports/{rid}<br/>3 zone: Conform / Neconform / Nevizibil"]
+    end
+
+    subgraph FLOW_B["FLUX B — Image Match (imagine)"]
+        B0["GET /matches/new<br/>upload mockup (sim)"] --> B1
+        B1["POST /matches<br/>analyze_sim — VISION LLM<br/>extrage criterii"] --> B2
+        B2["GET /matches/{id}<br/>match_wait: listă criterii<br/>+ upload poză reală"] --> B3
+        B3["POST /matches/{id}/real<br/>compare_real(sim_report, real)<br/>VISION LLM + 1 retry"] --> B4
+        B4["GET /matches/{id}/report<br/>tabel rows + summary<br/>match_type / confidence"]
+    end
+
+    A1 -.-> DB[(SQLite ciptronic.db<br/>sessions · reports · match_sessions)]
+    A9 -.-> DB
+    B1 -.-> DB
+    B3 -.-> DB
+
+    A1 -.-> LLM{{Anthropic<br/>Claude Sonnet 4.6}}
+    A9 -.-> LLM
+    A4 -.-> LLM
+    B1 -.-> LLM
+    B3 -.-> LLM

@@ -36,3 +36,6 @@ tests/fixtures/images/*.png
 # OS
 Thumbs.db
 .DS_Store
+
+# Docs interne
+docs/INSTRUCTIONS.md

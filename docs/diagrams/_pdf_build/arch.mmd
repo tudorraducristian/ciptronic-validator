@@ -1,0 +1,59 @@
+flowchart TB
+    subgraph CLIENT["Browser (single-user, local)"]
+        UI["HTML + HTMX + Jinja2 templates<br/>web/templates · web/static/styles.css"]
+    end
+
+    subgraph ENTRY["Entry point"]
+        MAIN["main.py → uvicorn<br/>from web.app import app"]
+    end
+
+    subgraph WEB["Web layer — web/app.py (FastAPI)"]
+        RA["Rute Flux A<br/>/sessions · /answer · /validate · /reports"]
+        RB["Rute Flux B<br/>/matches · /real · /report"]
+        HZ["/healthz · / (landing)"]
+    end
+
+    subgraph AGENTS["Agent layer — agents/"]
+        DISC["discovery.py<br/>build_messages · parse_response<br/>merge_answers · is_schema_complete"]
+        INSP["inspector.py<br/>build_messages · parse_report"]
+        LLMC["llm_client.py<br/>LLMClient: complete_text / complete_vision"]
+    end
+
+    subgraph ENGINE["image_matcher/engine.py"]
+        ENG["analyze_sim · compare_real<br/>encode_image · parse_* · call_llm"]
+    end
+
+    subgraph SCHEMASL["schemas/"]
+        SCH["loader.py + *.json (tricou.json)<br/>available_product_types · load_schema<br/>empty_state · applicable_leaf_keys"]
+    end
+
+    subgraph DATA["db/ — persistență"]
+        REPO["repository.py<br/>create/update/finalize/save"]
+        SQL["schema.sql<br/>discovery_sessions · validation_reports · match_sessions"]
+    end
+
+    subgraph PROMPTS["prompts/"]
+        PR["discovery.md · inspector.md<br/>(SIM/COMPARE prompts inline în engine)"]
+    end
+
+    EXT{{"Anthropic API<br/>Claude Sonnet 4.6"}}
+    DB[(SQLite<br/>ciptronic.db)]
+    FS[/"Filesystem<br/>uploads/"/]
+
+    STREAMLIT["image_matcher/app.py · run.py<br/>(Streamlit standalone, dev tool)"]
+
+    UI <--> WEB
+    MAIN --> WEB
+    RA --> DISC & INSP & SCH & REPO
+    RB --> ENG & REPO
+    DISC --> PR
+    INSP --> PR
+    DISC -.-> LLMC
+    INSP -.-> LLMC
+    LLMC --> EXT
+    ENG --> EXT
+    REPO --> DB
+    SQL -. init .-> DB
+    RA --> FS
+    RB --> FS
+    STREAMLIT --> ENG
