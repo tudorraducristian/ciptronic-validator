@@ -3,10 +3,35 @@
 {% block content %}
 <main class="page page--narrow">
     <h1>Validare produs personalizat</h1>
-    <p>
-      Alege felul în care vrei să specifici produsul. Ambele rute duc la un raport de
-      validare, dar pleacă de la inputuri diferite și produc rapoarte diferite.
-    </p>
+
+    <section class="email-fetch-section">
+      <h2>Cereri din e-mail</h2>
+      <form
+        hx-post="/email-agent/fetch"
+        hx-target="#email-results"
+        hx-swap="innerHTML"
+        hx-indicator="#email-fetch-spinner"
+        class="email-fetch-form"
+      >
+        <label>
+          De la
+          <input type="date" name="date_start" required>
+        </label>
+        <label>
+          Până la
+          <input type="date" name="date_end" required>
+        </label>
+        <button type="submit" class="btn btn--primary">
+          Verifică cereri pe e-mail
+        </button>
+        <span id="email-fetch-spinner" class="htmx-indicator">Se încarcă…</span>
+      </form>
+      <div id="email-results" style="margin-top: var(--s-5);"></div>
+    </section>
+
+    <hr class="divider">
+
+    <p>Sau pornește manual un flux nou:</p>
 
     <div class="choice-grid">
       <a class="choice-card" href="/sessions/new">
