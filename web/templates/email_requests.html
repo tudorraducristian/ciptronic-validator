@@ -66,7 +66,7 @@
           hx-target="body">
       <input type="hidden" name="product_type" value="{{ req.product_type }}">
       <input type="hidden" name="description" value="{{ req.description }}">
-      <input type="hidden" name="prefilled_state_json" value="{{ req.prefilled_state | tojson }}">
+      <input type="hidden" name="prefilled_state_json" value="{{ req.prefilled_state | json_attr }}">
       <button type="submit" class="btn btn--primary">Deschide sesiune →</button>
     </form>
   </div>

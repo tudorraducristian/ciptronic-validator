@@ -29,6 +29,9 @@ from schemas import loader
 
 BASE_DIR = Path(__file__).parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+import html as _html
+TEMPLATES.env.filters["json_attr"] = lambda v: _html.escape(json.dumps(v, ensure_ascii=False))
+
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "./ciptronic.db")
 UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", str(BASE_DIR.parent / "uploads")))

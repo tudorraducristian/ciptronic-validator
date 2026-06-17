@@ -1,6 +1,7 @@
 import base64
 import os
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -48,11 +49,14 @@ class GmailClient:
 
     def fetch_emails(self, date_start: str, date_end: str) -> list[EmailMessage]:
         """Returnează emailurile primite între date_start și date_end (format YYYY-MM-DD)."""
-        query = f"after:{date_start.replace('-', '/')} before:{date_end.replace('-', '/')}"
+        end_exclusive = (date.fromisoformat(date_end) + timedelta(days=1)).strftime("%Y/%m/%d")
+        query = f"after:{date_start.replace('-', '/')} before:{end_exclusive}"
+        import logging; logging.warning(f"[GmailClient] query={query!r}")
         result = self._service.users().messages().list(
             userId="me", q=query
         ).execute()
         messages = result.get("messages", [])
+        import logging; logging.warning(f"[GmailClient] messages={messages}")
         return [self._fetch_and_parse(m["id"]) for m in messages]
 
     def _fetch_and_parse(self, msg_id: str) -> EmailMessage:
