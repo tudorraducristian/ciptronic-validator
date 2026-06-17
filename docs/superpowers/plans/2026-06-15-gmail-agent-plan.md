@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Adaugă pe pagina principală un buton „Verifică cereri pe e-mail" cu interval de date; aplicația citește emailurile dintr-un inbox Gmail dedicat, extrage cererile de produse cu LLM și le prezintă ca o listă din care angajatul poate deschide direct sesiuni Discovery pre-completate.
+**Goal:** Adaugă pe pagina principală un buton „Verifică cereri pe e-mail" cu interval de date; aplicația citește emailurile dintr-un inbox Gmail dedicat, extrage cererile de produse cu LLM (folosind schema reală a fiecărui produs) și le prezintă grupate pe email sursă — cu chipuri pentru câmpurile extrase și câmpurile lipsă marcate — din care angajatul poate deschide direct sesiuni Discovery pre-completate.
 
-**Architecture:** Modul nou `email_agent/` cu două fișiere (`gmail_client.py` + `email_extractor.py`). Două rute noi în `web/app.py`. UI pe `index.html`. Niciun tabel nou în DB — sesiunile Discovery create sunt identice cu cele create manual.
+**Architecture:** Modul nou `email_agent/` cu două fișiere (`gmail_client.py` + `email_extractor.py`). Două rute noi în `web/app.py`. UI pe `index.html` + `email_requests.html` + CSS nou în `styles.css`. Niciun tabel nou în DB — sesiunile Discovery create sunt identice cu cele create manual.
 
 **Tech Stack:** Python 3.11+, FastAPI + Jinja2 (existente), SQLite (existent), `google-auth-oauthlib>=1.2`, `google-api-python-client>=2.120`, pytest (existent)
 
@@ -16,11 +16,12 @@
 |---|---|---|
 | `email_agent/__init__.py` | Creat | Marker pachet |
 | `email_agent/gmail_client.py` | Creat | OAuth2 + fetch emails by date range |
-| `email_agent/email_extractor.py` | Creat | LLM: extrage ProductRequest-uri din email |
+| `email_agent/email_extractor.py` | Creat | LLM extrage ProductRequest-uri folosind schema reală; calculează câmpurile lipsă |
 | `web/app.py` | Modificat | Adaugă `POST /email-agent/fetch` și `POST /email-agent/create-session` |
 | `web/templates/index.html` | Modificat | Adaugă secțiunea cu câmpuri dată + buton |
-| `web/templates/email_requests.html` | Creat | Lista de cereri extrase (parțial HTMX) |
-| `tests/unit/test_email_extractor.py` | Creat | Teste extragere cereri din email |
+| `web/templates/email_requests.html` | Creat | Lista cereri grupată pe email, chipuri câmpuri, câmpuri lipsă |
+| `web/static/styles.css` | Modificat | Stiluri noi: `.email-group`, `.request-card`, `.chip`, `.chip--missing`, `.badge-product` |
+| `tests/unit/test_email_extractor.py` | Creat | Teste extragere + câmpuri lipsă |
 | `tests/e2e/test_email_agent_routes.py` | Creat | Teste rute `/email-agent/*` |
 | `requirements.txt` | Modificat | 2 dependențe noi |
 | `.gitignore` | Modificat | `gmail_token.json`, `credentials.json` |
@@ -46,7 +47,7 @@ google-auth-oauthlib>=1.2
 google-api-python-client>=2.120
 ```
 
-- [ ] **Step 1.3: Adaugă în `.gitignore`** (la finalul fișierului, după secțiunea IDE)
+- [ ] **Step 1.3: Adaugă în `.gitignore`** (la finalul fișierului)
 
 ```
 # Gmail Agent
@@ -69,13 +70,7 @@ git commit -m "chore: add Gmail API dependencies and gitignore token files"
 - Creat: `email_agent/__init__.py`
 - Creat: `email_agent/gmail_client.py`
 
-Modulul expune o interfață clară (`fetch_emails`) pe care testele o vor mock-ui. Nu scriem teste de integrare pentru Gmail API real.
-
-- [ ] **Step 2.1: Creează `email_agent/__init__.py`**
-
-Fișier gol:
-```python
-```
+- [ ] **Step 2.1: Creează `email_agent/__init__.py`** (fișier gol)
 
 - [ ] **Step 2.2: Implementează `email_agent/gmail_client.py`**
 
@@ -171,11 +166,31 @@ git commit -m "feat(email_agent): GmailClient — OAuth2 + fetch emails by date 
 
 ---
 
-## Task 3: `email_agent/email_extractor.py` — extragere cereri LLM
+## Task 3: `email_agent/email_extractor.py`
 
 **Fișiere:**
 - Creat: `email_agent/email_extractor.py`
 - Test: `tests/unit/test_email_extractor.py`
+
+### Ce face acest modul
+
+1. Pentru fiecare email, construiește un prompt care include **schema reală** a fiecărui tip de produs disponibil (câmpuri, labels, hints) — LLM-ul returnează chei exacte din schemă, nu chei inventate.
+2. După extracție, calculează `missing_fields` = câmpurile din schemă care **lipsesc** din `prefilled_state` — folosite în UI pentru chipurile galbene.
+
+### Cum arată schema în prompt
+
+`_schema_to_text(schema)` transformă `tricou.json` în:
+```
+  culoare_principala    — Culoare principală (ex: roșu, negru, alb melange)
+  material              — Material (ex: bumbac 100%, poliester, mix)
+  croiala               — Croială (regular / slim / oversize)
+  guler                 — Tip guler (rotund / V / polo)
+  maneci                — Mâneci (scurte / lungi / 3/4)
+  branding.pozitie      — Poziție (ex: piept stâng, spate centru)
+  branding.tehnica      — Tehnică (serigrafie / broderie / DTF / sublimare)
+  branding.culori       — Culori (listă)
+  branding.dimensiuni_aproximative — Dimensiuni aproximative (ex: 10cm x 10cm)
+```
 
 - [ ] **Step 3.1: Scrie testele care vor eșua**
 
@@ -210,18 +225,18 @@ def test_extract_single_product():
     llm = FakeLLM("""[
       {
         "product_type": "tricou",
-        "description": "tricou polo navy cu broderie ECJ, font Bion Wide, 6 cm",
+        "description": "tricou polo navy cu broderie ECJ",
         "prefilled_state": {
-          "tip_produs": "polo",
-          "culoare": "navy",
-          "branding": {"tehnica": "broderie", "text": "ECJ", "font": "Bion Wide", "dimensiune_cm": 6}
+          "culoare_principala": "navy",
+          "guler": "polo",
+          "branding": {"tehnica": "broderie", "culori": ["alb"]}
         }
       }
     ]""")
-    requests = email_extractor.extract(_make_email("vreau tricouri polo navy cu broderie ECJ"), llm)
+    requests = email_extractor.extract(_make_email("tricou polo navy cu broderie ECJ"), llm)
     assert len(requests) == 1
     assert requests[0].product_type == "tricou"
-    assert requests[0].prefilled_state["culoare"] == "navy"
+    assert requests[0].prefilled_state["culoare_principala"] == "navy"
     assert requests[0].email_sender == "E-CABLAJE S.A. <office@ecablaje.ro>"
 
 
@@ -230,23 +245,18 @@ def test_extract_multiple_products():
       {
         "product_type": "tricou",
         "description": "tricouri polo navy",
-        "prefilled_state": {"tip_produs": "polo", "culoare": "navy"}
-      },
-      {
-        "product_type": "hanorac",
-        "description": "hanorace gri fara personalizare",
-        "prefilled_state": {"culoare": "gri"}
+        "prefilled_state": {"culoare_principala": "navy", "guler": "polo"}
       },
       {
         "product_type": "tricou",
-        "description": "jachete fleece negre",
-        "prefilled_state": {"culoare": "negru"}
+        "description": "tricouri albe maneci lungi",
+        "prefilled_state": {"culoare_principala": "alb", "maneci": "lungi"}
       }
     ]""")
     requests = email_extractor.extract(
-        _make_email("vreau tricouri polo navy, hanorace gri si jachete fleece negre"), llm
+        _make_email("vreau tricouri polo navy si tricouri albe maneci lungi"), llm
     )
-    assert len(requests) == 3
+    assert len(requests) == 2
 
 
 def test_extract_partial_fields_no_invention():
@@ -255,13 +265,37 @@ def test_extract_partial_fields_no_invention():
         "product_type": "tricou",
         "description": "tricou polo cu broderie",
         "prefilled_state": {
+          "guler": "polo",
           "branding": {"tehnica": "broderie"}
         }
       }
     ]""")
     requests = email_extractor.extract(_make_email("tricou polo cu broderie"), llm)
     assert len(requests) == 1
-    assert "culoare" not in requests[0].prefilled_state
+    # culoare_principala nu e menționată — nu trebuie să apară în prefilled_state
+    assert "culoare_principala" not in requests[0].prefilled_state
+
+
+def test_missing_fields_calculated_correctly():
+    llm = FakeLLM("""[
+      {
+        "product_type": "tricou",
+        "description": "tricou polo navy",
+        "prefilled_state": {
+          "culoare_principala": "navy",
+          "guler": "polo"
+        }
+      }
+    ]""")
+    requests = email_extractor.extract(_make_email("tricou polo navy"), llm)
+    assert len(requests) == 1
+    # material, croiala, maneci, branding.* lipsesc din prefilled_state
+    assert "material" in requests[0].missing_fields
+    assert "croiala" in requests[0].missing_fields
+    assert "branding.tehnica" in requests[0].missing_fields
+    # câmpurile cunoscute NU sunt în missing_fields
+    assert "culoare_principala" not in requests[0].missing_fields
+    assert "guler" not in requests[0].missing_fields
 
 
 def test_extract_returns_empty_on_no_products():
@@ -271,10 +305,25 @@ def test_extract_returns_empty_on_no_products():
 
 
 def test_extract_handles_json_fenced_response():
-    llm = FakeLLM('```json\n[{"product_type": "tricou", "description": "tricou alb", "prefilled_state": {"culoare": "alb"}}]\n```')
+    llm = FakeLLM('```json\n[{"product_type": "tricou", "description": "tricou alb", "prefilled_state": {"culoare_principala": "alb"}}]\n```')
     requests = email_extractor.extract(_make_email("tricou alb"), llm)
     assert len(requests) == 1
-    assert requests[0].prefilled_state["culoare"] == "alb"
+    assert requests[0].prefilled_state["culoare_principala"] == "alb"
+
+
+def test_prompt_includes_schema_fields(monkeypatch):
+    """Verifică că promptul trimis LLM-ului conține câmpurile reale din schemă."""
+    calls = []
+
+    class CaptureLLM:
+        def complete_text(self, system, user):
+            calls.append(user)
+            return "[]"
+
+    email_extractor.extract(_make_email("test"), CaptureLLM())
+    assert len(calls) == 1
+    assert "culoare_principala" in calls[0]
+    assert "branding.tehnica" in calls[0]
 ```
 
 - [ ] **Step 3.2: Rulează testele să confirmi că eșuează**
@@ -289,7 +338,7 @@ Așteptat: FAIL — `cannot import name 'email_extractor'`
 
 ```python
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from email_agent.gmail_client import EmailMessage
 from schemas import loader
@@ -297,17 +346,21 @@ from schemas import loader
 
 SYSTEM_PROMPT = """Ești un asistent care extrage cereri de produse personalizate din emailuri de business.
 
-Emailurile sunt trimise de clienți care comandă produse textile personalizate (tricouri, hanorace, jachete, șepci etc.).
+Emailurile sunt trimise de clienți care comandă produse textile personalizate.
 
 Sarcina ta: analizează corpul emailului și extrage FIECARE tip de produs menționat ca o cerere separată.
 
 Pentru fiecare cerere returnează un obiect JSON cu:
-- "product_type": tipul de produs (folosește exact una din valorile din lista furnizată)
-- "description": descrierea brută a acelui produs din email (propoziție sau frază scurtă)
-- "prefilled_state": obiect cu câmpurile pe care le poți extrage cu CERTITUDINE din email
+- "product_type": tipul de produs (folosește EXACT una din valorile din lista furnizată)
+- "description": descrierea brută a acelui produs din email (1-2 propoziții)
+- "prefilled_state": obiect cu câmpurile pe care le poți extrage cu CERTITUDINE din email,
+  folosind EXACT cheile din schema furnizată (inclusiv notația cu punct pentru subcâmpuri,
+  ex: "branding.tehnica", NU "branding": {"tehnica": ...} pentru câmpuri individuale —
+  EXCEPȚIE: dacă extragi mai multe subcâmpuri ale aceluiași obiect, grupează-le în obiect)
 
 IMPORTANT:
-- Nu inventa valori. Dacă un câmp nu e menționat explicit, NU îl include în prefilled_state.
+- Nu inventa valori. Dacă un câmp nu e menționat explicit în email, NU îl include.
+- Folosește EXACT cheile din schema — nu traduce, nu redenumi.
 - Returnează un array JSON, chiar dacă e gol ([]).
 - Răspunde EXCLUSIV cu JSON valid, fără text suplimentar."""
 
@@ -320,12 +373,23 @@ class ProductRequest:
     product_type: str
     description: str
     prefilled_state: dict
+    missing_fields: list[str] = field(default_factory=list)
 
 
 def extract(message: EmailMessage, llm) -> list[ProductRequest]:
     available_types = loader.available_product_types()
+
+    # Construiește textul schemelor pentru toate tipurile disponibile
+    schemas_text = ""
+    schemas_map = {}
+    for ptype in available_types:
+        schema = loader.load_schema(ptype)
+        schemas_map[ptype] = schema
+        schemas_text += f'\nSchema pentru "{ptype}":\n{_schema_to_text(schema)}\n'
+
     user_content = json.dumps({
         "tipuri_disponibile": available_types,
+        "scheme": schemas_text,
         "expeditor": message.sender,
         "subiect": message.subject,
         "data": message.date,
@@ -335,18 +399,53 @@ def extract(message: EmailMessage, llm) -> list[ProductRequest]:
     raw = llm.complete_text(system=SYSTEM_PROMPT, user=user_content)
     items = _parse_json_array(raw)
 
-    return [
-        ProductRequest(
+    result = []
+    for item in items:
+        ptype = item.get("product_type")
+        if ptype not in available_types:
+            continue
+        prefilled = item.get("prefilled_state", {})
+        schema = schemas_map[ptype]
+        missing = _compute_missing_fields(schema, prefilled)
+        result.append(ProductRequest(
             email_sender=message.sender,
             email_subject=message.subject,
             email_date=message.date,
-            product_type=item["product_type"],
+            product_type=ptype,
             description=item.get("description", ""),
-            prefilled_state=item.get("prefilled_state", {}),
-        )
-        for item in items
-        if item.get("product_type") in available_types
-    ]
+            prefilled_state=prefilled,
+            missing_fields=missing,
+        ))
+    return result
+
+
+def _schema_to_text(schema: dict) -> str:
+    lines = []
+    for f in schema["fields"]:
+        if f.get("type") == "object":
+            for sub in f["subfields"]:
+                key = f"{f['key']}.{sub['key']}"
+                hint = sub.get("hint", "")
+                lines.append(f"  {key:<45} — {sub['label']}{' (' + hint + ')' if hint else ''}")
+        else:
+            hint = f.get("hint", "")
+            lines.append(f"  {f['key']:<45} — {f['label']}{' (' + hint + ')' if hint else ''}")
+    return "\n".join(lines)
+
+
+def _compute_missing_fields(schema: dict, prefilled_state: dict) -> list[str]:
+    """Returnează cheile din schemă care lipsesc din prefilled_state."""
+    all_keys = loader.leaf_keys(schema)
+    missing = []
+    for dotted_key in all_keys:
+        parts = dotted_key.split(".")
+        val = prefilled_state
+        for p in parts:
+            if not isinstance(val, dict) or p not in val:
+                missing.append(dotted_key)
+                break
+            val = val[p]
+    return missing
 
 
 def _parse_json_array(text: str) -> list:
@@ -371,13 +470,13 @@ def _parse_json_array(text: str) -> list:
 pytest tests/unit/test_email_extractor.py -v
 ```
 
-Așteptat: 5 PASSED
+Așteptat: 7 PASSED
 
 - [ ] **Step 3.5: Commit**
 
 ```
 git add email_agent/email_extractor.py tests/unit/test_email_extractor.py
-git commit -m "feat(email_agent): email_extractor — LLM product request extraction"
+git commit -m "feat(email_agent): email_extractor — schema-aware LLM extraction + missing fields"
 ```
 
 ---
@@ -395,14 +494,13 @@ Creează `tests/e2e/test_email_agent_routes.py`:
 ```python
 import json
 from email_agent.gmail_client import EmailMessage
-from email_agent.email_extractor import ProductRequest
 
 
 class FakeGmail:
-    def __init__(self, messages: list[EmailMessage]):
+    def __init__(self, messages):
         self._messages = messages
 
-    def fetch_emails(self, date_start: str, date_end: str) -> list[EmailMessage]:
+    def fetch_emails(self, date_start, date_end):
         return self._messages
 
 
@@ -418,14 +516,12 @@ def _make_email(body="tricou polo navy cu broderie ECJ"):
 
 def test_fetch_returns_list_with_results(client, fake_llm, monkeypatch):
     from web import app as web_app
-
-    fake_gmail = FakeGmail([_make_email()])
-    monkeypatch.setattr(web_app, "get_gmail_client", lambda: fake_gmail)
+    monkeypatch.setattr(web_app, "get_gmail_client", lambda: FakeGmail([_make_email()]))
 
     fake_llm.queue_text(json.dumps([{
         "product_type": "tricou",
         "description": "tricou polo navy cu broderie ECJ",
-        "prefilled_state": {"culoare": "navy"},
+        "prefilled_state": {"culoare_principala": "navy", "guler": "polo"},
     }]))
 
     r = client.post(
@@ -435,13 +531,50 @@ def test_fetch_returns_list_with_results(client, fake_llm, monkeypatch):
     assert r.status_code == 200
     assert "tricou" in r.text
     assert "E-CABLAJE" in r.text
+    assert "navy" in r.text
+
+
+def test_fetch_shows_missing_fields(client, fake_llm, monkeypatch):
+    from web import app as web_app
+    monkeypatch.setattr(web_app, "get_gmail_client", lambda: FakeGmail([_make_email()]))
+
+    fake_llm.queue_text(json.dumps([{
+        "product_type": "tricou",
+        "description": "tricou polo navy",
+        "prefilled_state": {"culoare_principala": "navy"},
+    }]))
+
+    r = client.post(
+        "/email-agent/fetch",
+        data={"date_start": "2026-06-01", "date_end": "2026-06-12"},
+    )
+    assert r.status_code == 200
+    # câmpurile lipsă trebuie să apară în HTML
+    assert "material" in r.text
+
+
+def test_fetch_groups_by_email(client, fake_llm, monkeypatch):
+    from web import app as web_app
+    monkeypatch.setattr(web_app, "get_gmail_client", lambda: FakeGmail([_make_email()]))
+
+    # un email cu 2 cereri
+    fake_llm.queue_text(json.dumps([
+        {"product_type": "tricou", "description": "polo navy", "prefilled_state": {"culoare_principala": "navy"}},
+        {"product_type": "tricou", "description": "tricou alb", "prefilled_state": {"culoare_principala": "alb"}},
+    ]))
+
+    r = client.post(
+        "/email-agent/fetch",
+        data={"date_start": "2026-06-01", "date_end": "2026-06-12"},
+    )
+    assert r.status_code == 200
+    # expeditorul apare o singură dată (grupare)
+    assert r.text.count("E-CABLAJE") == 1
 
 
 def test_fetch_empty_interval(client, monkeypatch):
     from web import app as web_app
-
-    fake_gmail = FakeGmail([])
-    monkeypatch.setattr(web_app, "get_gmail_client", lambda: fake_gmail)
+    monkeypatch.setattr(web_app, "get_gmail_client", lambda: FakeGmail([]))
 
     r = client.post(
         "/email-agent/fetch",
@@ -452,7 +585,7 @@ def test_fetch_empty_interval(client, monkeypatch):
 
 
 def test_create_session_from_request(client, fake_llm):
-    prefilled = {"culoare": "navy", "branding": {"tehnica": "broderie"}}
+    prefilled = {"culoare_principala": "navy", "branding": {"tehnica": "broderie"}}
     fake_llm.queue_text(json.dumps({
         "state": prefilled,
         "intrebari": [{"camp": "material", "intrebare": "Ce material?"}],
@@ -472,10 +605,10 @@ def test_create_session_from_request(client, fake_llm):
     assert r.headers["HX-Redirect"].startswith("/sessions/")
 
 
-def test_create_session_session_has_prefilled_state(client, fake_llm):
-    prefilled = {"culoare": "navy"}
+def test_create_session_has_prefilled_state(client, fake_llm):
+    prefilled = {"culoare_principala": "navy"}
     fake_llm.queue_text(json.dumps({
-        "state": {"culoare": "navy", "material": None},
+        "state": {"culoare_principala": "navy"},
         "intrebari": [{"camp": "material", "intrebare": "Ce material?"}],
         "done": False,
     }))
@@ -502,9 +635,9 @@ pytest tests/e2e/test_email_agent_routes.py -v
 
 Așteptat: FAIL — rutele nu există
 
-- [ ] **Step 4.3: Adaugă rutele în `web/app.py`**
+- [ ] **Step 4.3: Adaugă în `web/app.py`**
 
-Adaugă după importurile existente:
+După importurile existente:
 
 ```python
 from email_agent.gmail_client import GmailClient
@@ -519,7 +652,7 @@ def get_gmail_client():
     return _gmail_singleton
 ```
 
-Adaugă la sfârșitul rutelor (înainte de EOF):
+Rute noi la sfârșitul fișierului:
 
 ```python
 @app.post("/email-agent/fetch", response_class=HTMLResponse)
@@ -533,21 +666,21 @@ def email_agent_fetch(
 
     if not messages:
         return TEMPLATES.TemplateResponse(
-            request,
-            "email_requests.html",
-            {"requests": [], "date_start": date_start, "date_end": date_end},
+            request, "email_requests.html",
+            {"groups": [], "date_start": date_start, "date_end": date_end},
         )
 
     llm = get_llm_client()
-    all_requests = []
+    # Grupăm cererile pe email sursă: list of {email, requests}
+    groups = []
     for msg in messages:
         extracted = email_extractor.extract(msg, llm)
-        all_requests.extend(extracted)
+        if extracted:
+            groups.append({"email": msg, "requests": extracted})
 
     return TEMPLATES.TemplateResponse(
-        request,
-        "email_requests.html",
-        {"requests": all_requests, "date_start": date_start, "date_end": date_end},
+        request, "email_requests.html",
+        {"groups": groups, "date_start": date_start, "date_end": date_end},
     )
 
 
@@ -590,7 +723,7 @@ def email_agent_create_session(
 pytest tests/e2e/test_email_agent_routes.py -v
 ```
 
-Așteptat: 4 PASSED
+Așteptat: 6 PASSED
 
 - [ ] **Step 4.5: Rulează suita completă**
 
@@ -598,100 +731,328 @@ Așteptat: 4 PASSED
 pytest -v
 ```
 
-Așteptat: toate testele existente PASSED + 4 noi
+Așteptat: toate testele existente + 6 noi PASSED
 
 - [ ] **Step 4.6: Commit**
 
 ```
 git add web/app.py tests/e2e/test_email_agent_routes.py
-git commit -m "feat(web): POST /email-agent/fetch and /email-agent/create-session"
+git commit -m "feat(web): POST /email-agent/fetch (grouped) and /email-agent/create-session"
 ```
 
 ---
 
-## Task 5: Template `web/templates/email_requests.html`
+## Task 5: CSS pentru componentele noi
 
 **Fișiere:**
-- Creat: `web/templates/email_requests.html`
+- Modificat: `web/static/styles.css`
 
-- [ ] **Step 5.1: Creează `web/templates/email_requests.html`**
+- [ ] **Step 5.1: Adaugă la sfârșitul `web/static/styles.css`**
 
-```html
-{% if requests %}
-<section class="email-requests">
-  <h2>Cereri extrase ({{ requests|length }})</h2>
-  <p class="subtitle">
-    Interval: {{ date_start }} – {{ date_end }}.
-    Dă click pe „Deschide sesiune" pentru a porni Discovery cu câmpurile pre-completate.
-  </p>
+```css
+/* ========== Email Agent — cereri din email ========== */
 
-  <div class="request-list">
-    {% for req in requests %}
-    <div class="request-card">
-      <div class="request-card__header">
-        <span class="request-card__sender">{{ req.email_sender }}</span>
-        <span class="request-card__date">{{ req.email_date }}</span>
-        <span class="request-card__subject">{{ req.email_subject }}</span>
-      </div>
-      <div class="request-card__body">
-        <span class="request-card__type">{{ req.product_type }}</span>
-        <p class="request-card__desc">{{ req.description }}</p>
-        {% if req.prefilled_state %}
-        <ul class="request-card__fields">
-          {% for key, val in req.prefilled_state.items() %}
-          <li><strong>{{ key }}:</strong>
-            {% if val is mapping %}
-              {% for k2, v2 in val.items() %}{{ k2 }}: {{ v2 }}{% if not loop.last %}, {% endif %}{% endfor %}
-            {% else %}
-              {{ val }}
-            {% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        {% endif %}
-      </div>
-      <div class="request-card__footer">
-        <form method="post" action="/email-agent/create-session">
-          <input type="hidden" name="product_type" value="{{ req.product_type }}">
-          <input type="hidden" name="description" value="{{ req.description }}">
-          <input type="hidden" name="prefilled_state_json" value="{{ req.prefilled_state | tojson }}">
-          <button type="submit" class="btn"
-            hx-post="/email-agent/create-session"
-            hx-include="closest form"
-            hx-target="body">
-            Deschide sesiune →
-          </button>
-        </form>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</section>
+/* Secțiunea de pe landing */
+.email-fetch-section {
+  margin-bottom: var(--s-6);
+  padding-bottom: var(--s-6);
+  border-bottom: 1px solid var(--c-border);
+}
+.email-fetch-section h2 {
+  font-size: 18px;
+  margin-bottom: var(--s-4);
+}
+.email-fetch-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+.email-fetch-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+.email-fetch-form input[type="date"] {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-border-2);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  min-width: 160px;
+}
+.email-fetch-form input[type="date"]:focus {
+  outline: none;
+  border-color: var(--c-info);
+  box-shadow: 0 0 0 3px rgba(30,41,59,0.1);
+}
+.htmx-indicator { display: none; font-size: 13px; color: var(--c-text-soft); }
+.htmx-request .htmx-indicator { display: inline; }
 
-{% else %}
-<section class="email-requests email-requests--empty">
-  <p>Niciun email găsit în intervalul <strong>{{ date_start }} – {{ date_end }}</strong>.</p>
-</section>
-{% endif %}
+/* Sumarul rezultatelor */
+.email-results-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: 10px 14px;
+  background: var(--c-accent-soft);
+  border: 1px solid #BBF7D0;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  color: var(--c-accent-ink);
+  margin-bottom: var(--s-5);
+}
+
+/* Grup email */
+.email-group { margin-bottom: var(--s-6); }
+.email-group__header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 10px 14px;
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.email-group__avatar {
+  width: 32px; height: 32px;
+  background: var(--c-info);
+  color: #fff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+.email-group__info { flex: 1; min-width: 0; }
+.email-group__sender {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--c-text);
+  display: block;
+}
+.email-group__subject {
+  font-size: 12px;
+  color: var(--c-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.email-group__date {
+  font-size: 12px;
+  color: var(--c-text-soft);
+  flex-shrink: 0;
+}
+
+/* Card cerere */
+.request-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-top: none;
+  padding: var(--s-4) var(--s-5);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-4);
+  align-items: start;
+}
+.request-card:last-child {
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.request-card + .request-card {
+  border-top: 1px dashed var(--c-border);
+}
+
+/* Badge tip produs */
+.badge-product {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #E0E7FF;
+  color: #312E81;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--s-2);
+}
+
+/* Descriere brută */
+.request-card__desc {
+  font-size: 13px;
+  color: var(--c-text-soft);
+  font-style: italic;
+  margin: var(--s-2) 0 var(--s-3);
+}
+
+/* Chipuri câmpuri */
+.field-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+.chip__key {
+  font-weight: 600;
+  color: var(--c-text-soft);
+  font-size: 11px;
+}
+.chip__val { font-weight: 500; }
+.chip--missing {
+  background: var(--c-warn-soft);
+  border-color: #FDE68A;
+  color: var(--c-warn-ink);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* Stare goală */
+.email-results-empty {
+  padding: var(--s-7) var(--s-5);
+  text-align: center;
+  color: var(--c-text-soft);
+  font-size: 14px;
+}
+
+/* Separator landing */
+.divider {
+  border: none;
+  border-top: 1px solid var(--c-border);
+  margin: var(--s-6) 0;
+}
 ```
 
 - [ ] **Step 5.2: Commit**
 
 ```
-git add web/templates/email_requests.html
-git commit -m "feat(web): email_requests template — lista cereri extrase"
+git add web/static/styles.css
+git commit -m "feat(web): CSS pentru email agent — email-group, request-card, chip"
 ```
 
 ---
 
-## Task 6: UI pe pagina principală (`index.html`)
+## Task 6: Template `web/templates/email_requests.html`
+
+**Fișiere:**
+- Creat: `web/templates/email_requests.html`
+
+- [ ] **Step 6.1: Creează `web/templates/email_requests.html`**
+
+```html
+{% if groups %}
+<div class="email-results-summary">
+  <span>✓ <strong>{{ groups|sum(attribute='requests')|list|length }} cereri</strong> extrase</span>
+  <span>·</span>
+  <span><strong>{{ groups|length }} email{% if groups|length != 1 %}uri{% endif %}</strong> procesate</span>
+  <span>·</span>
+  <span>Câmpurile cunoscute sunt pre-completate — Discovery va întreba doar ce lipsește</span>
+</div>
+
+{% for group in groups %}
+<div class="email-group">
+  <div class="email-group__header">
+    <div class="email-group__avatar">
+      {{ group.email.sender | truncate(2, True, '') | upper }}
+    </div>
+    <div class="email-group__info">
+      <span class="email-group__sender">{{ group.email.sender }}</span>
+      <span class="email-group__subject">{{ group.email.subject }}</span>
+    </div>
+    <span class="email-group__date">{{ group.email.date }}</span>
+  </div>
+
+  {% for req in group.requests %}
+  <div class="request-card">
+    <div>
+      <span class="badge-product">{{ req.product_type }}</span>
+      {% if group.requests|length > 1 %}
+      <span style="font-size:12px;color:var(--c-text-soft);margin-left:8px;">
+        cerere {{ loop.index }} din {{ group.requests|length }}
+      </span>
+      {% endif %}
+
+      <p class="request-card__desc">„{{ req.description }}"</p>
+
+      <div class="field-chips">
+        {% for key, val in req.prefilled_state.items() %}
+          {% if val is mapping %}
+            {% for k2, v2 in val.items() %}
+            <div class="chip">
+              <span class="chip__key">{{ key }}.{{ k2 }}</span>
+              <span class="chip__val">
+                {% if v2 is iterable and v2 is not string %}{{ v2 | join(', ') }}{% else %}{{ v2 }}{% endif %}
+              </span>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div class="chip">
+            <span class="chip__key">{{ key }}</span>
+            <span class="chip__val">
+              {% if val is iterable and val is not string %}{{ val | join(', ') }}{% else %}{{ val }}{% endif %}
+            </span>
+          </div>
+          {% endif %}
+        {% endfor %}
+
+        {% for missing_key in req.missing_fields %}
+        <div class="chip chip--missing">{{ missing_key }} — necunoscut</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <form method="post" action="/email-agent/create-session">
+      <input type="hidden" name="product_type" value="{{ req.product_type }}">
+      <input type="hidden" name="description" value="{{ req.description }}">
+      <input type="hidden" name="prefilled_state_json" value="{{ req.prefilled_state | tojson }}">
+      <button type="submit" class="btn btn--primary"
+        hx-post="/email-agent/create-session"
+        hx-include="closest form"
+        hx-target="body">
+        Deschide sesiune →
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="email-results-empty">
+  Niciun email găsit în intervalul <strong>{{ date_start }} – {{ date_end }}</strong>.
+</div>
+{% endif %}
+```
+
+- [ ] **Step 6.2: Commit**
+
+```
+git add web/templates/email_requests.html
+git commit -m "feat(web): email_requests template — grupat pe email, chipuri câmpuri, lipsă marcate"
+```
+
+---
+
+## Task 7: UI pe pagina principală (`index.html`)
 
 **Fișiere:**
 - Modificat: `web/templates/index.html`
 
-- [ ] **Step 6.1: Modifică `web/templates/index.html`**
-
-Înlocuiește tot conținutul blocului `{% block content %}`:
+- [ ] **Step 7.1: Înlocuiește tot conținutul `web/templates/index.html`**
 
 ```html
 {% extends "base.html" %}
@@ -709,22 +1070,20 @@ git commit -m "feat(web): email_requests template — lista cereri extrase"
         hx-indicator="#email-fetch-spinner"
         class="email-fetch-form"
       >
-        <div class="email-fetch-form__fields">
-          <label>
-            De la
-            <input type="date" name="date_start" required>
-          </label>
-          <label>
-            Până la
-            <input type="date" name="date_end" required>
-          </label>
-        </div>
-        <button type="submit" class="btn">
+        <label>
+          De la
+          <input type="date" name="date_start" required>
+        </label>
+        <label>
+          Până la
+          <input type="date" name="date_end" required>
+        </label>
+        <button type="submit" class="btn btn--primary">
           Verifică cereri pe e-mail
         </button>
         <span id="email-fetch-spinner" class="htmx-indicator">Se încarcă…</span>
       </form>
-      <div id="email-results"></div>
+      <div id="email-results" style="margin-top: var(--s-5);"></div>
     </section>
 
     <hr class="divider">
@@ -765,7 +1124,7 @@ git commit -m "feat(web): email_requests template — lista cereri extrase"
 {% endblock %}
 ```
 
-- [ ] **Step 6.2: Rulează suita de teste să nu existe regresii**
+- [ ] **Step 7.2: Rulează suita completă**
 
 ```
 pytest -v
@@ -773,28 +1132,28 @@ pytest -v
 
 Așteptat: toate PASSED
 
-- [ ] **Step 6.3: Commit**
+- [ ] **Step 7.3: Commit**
 
 ```
 git add web/templates/index.html
-git commit -m "feat(web): add email fetch section to landing page"
+git commit -m "feat(web): landing page — secțiune email fetch cu HTMX"
 ```
 
 ---
 
-## Task 7: Smoke test manual
+## Task 8: Smoke test manual
 
-- [ ] **Step 7.1: Pornește serverul**
+- [ ] **Step 8.1: Pornește serverul**
 
 ```
 .venv\Scripts\python -m uvicorn main:app --env-file .env --port 8000
 ```
 
-- [ ] **Step 7.2: Verifică pagina principală**
+- [ ] **Step 8.2: Verifică pagina principală**
 
-Deschide `http://localhost:8000/` — trebuie să apară secțiunea „Cereri din e-mail" cu câmpurile dată + buton, deasupra cardurilor existente.
+Deschide `http://localhost:8000/` — trebuie să apară secțiunea „Cereri din e-mail" cu câmpurile dată + buton, deasupra separatorului și cardurilor existente.
 
-- [ ] **Step 7.3: Rulează suita completă de teste**
+- [ ] **Step 8.3: Rulează suita completă de teste**
 
 ```
 pytest -v
@@ -802,9 +1161,9 @@ pytest -v
 
 Așteptat: toate PASSED
 
-- [ ] **Step 7.4: Commit final**
+- [ ] **Step 8.4: Commit final**
 
 ```
 git add .
-git commit -m "feat(email_agent): MVP Gmail agent — extragere cereri + sesiuni Discovery pre-completate"
+git commit -m "feat(email_agent): MVP Gmail agent — extragere schema-aware, grupare email, UI complet"
 ```
