@@ -39,3 +39,7 @@ Thumbs.db
 
 # Docs interne
 docs/INSTRUCTIONS.md
+
+# Gmail Agent
+gmail_token.json
+credentials.json
