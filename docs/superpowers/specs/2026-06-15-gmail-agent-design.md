@@ -1,34 +1,36 @@
-# Agent Email Gmail — Spec de Design
+# Agent Email Gmail — Spec de Design (v2)
 
-**Data:** 2026-06-15
+**Data:** 2026-06-17
 **Status:** Aprobat
 
 ---
 
 ## Context
 
-Ciptronic Validator procesează în prezent produse printr-o interfață web (două fluxuri: Discovery/Flow A pentru descrieri text, Image Match/Flow B pentru poze mockup). Clienții interacționează exclusiv prin interfața web.
+Ciptronic Validator are deja două fluxuri operaționale: Discovery (descriere text → specificație completă) și Image Match (mockup → comparare vizuală). Ambele sunt declanșate manual de angajat.
 
-Acest spec descrie un agent email care monitorizează un inbox Gmail dedicat, procesează automat cererile de validare primite și răspunde cu un raport PDF — extinde sistemul existent fără a modifica logica de bază.
+Clienții trimit cereri de personalizare pe email (ex. „vreau 50 tricouri polo cu broderie ECJ, font Bion Wide, 6 cm, culoare navy"). Până acum angajatul copia manual informațiile din email în formularul Discovery. Acest spec descrie o extensie care automatizează acel pas: angajatul alege un interval de date, aplicația citește emailurile și returnează o listă de cereri pre-extrase, gata de deschis ca sesiuni Discovery.
 
 ---
 
 ## Obiective
 
-- Clienții trimit cereri de validare pe email (descriere text și/sau imagine mockup atașată)
-- Un agent verifică Gmail-ul la fiecare 2–5 minute, clasifică emailul și rulează flow-ul corespunzător deja existent
-- La finalizare, agentul răspunde clientului cu raportul ca fișier PDF atașat
-- Un panou de monitorizare pentru operatori (`GET /email-jobs`) afișează toate emailurile procesate și statusul lor
-- Emailurile ambigue declanșează automat un răspuns de clarificare; operatorul nu trebuie să intervină
+- Angajatul selectează un interval de date și apasă un buton pe pagina principală
+- Aplicația citește toate emailurile primite în acel interval dintr-un inbox Gmail dedicat
+- Un LLM extrage cererile de produse din fiecare email (un email poate genera mai multe cereri)
+- Angajatul vede o listă de cereri; dă click pe una → se deschide o sesiune Discovery pre-completată
+- Câmpurile cunoscute sunt deja populate; agentul pune întrebări doar pentru ce lipsește
 
 ---
 
-## Non-Obiective (MVP)
+## Non-Obiective (excluse explicit)
 
-- Notificări în timp real prin push (Gmail Pub/Sub) — amânat; polling-ul e suficient
-- Flux hibrid (descriere text + mockup în același email ca un flux combinat) — exclus conform cerinței de business confirmate
-- Interfață web pentru clienți — clienții interacționează exclusiv prin email
-- Suport multi-limbă — doar română/engleză
+- Polling automat în fundal — nu există niciun proces care rulează periodic
+- Clasificare spam/unclear — inbox-ul e dedicat exclusiv cererilor de produse
+- Generare PDF sau trimitere răspuns pe email
+- Panou de monitorizare și tabel `email_jobs`
+- Retry mechanism pentru job-uri
+- Flow B (Image Match) declanșat din email — doar Discovery
 
 ---
 
@@ -36,121 +38,152 @@ Acest spec descrie un agent email care monitorizează un inbox Gmail dedicat, pr
 
 ### Abordare
 
-Un nou modul Python `email_agent/` care importă direct din modulele existente (`agents.discovery`, `agents.inspector`, `image_matcher.engine`, `db.repository`). Rulează ca proces separat (`python -m email_agent.poller`) alături de `uvicorn`.
+Două componente noi:
 
-Zero duplicare de logică — agentul email este pur și simplu un adaptor de intrare peste fluxurile existente.
+1. **`email_agent/gmail_client.py`** — wrapper OAuth2 care autentifică și returnează emailurile dintr-un interval de date. Aceeași structură ca în v1, fără `mark_read` și `send_email`.
+
+2. **`email_agent/email_extractor.py`** — primește conținutul unui email și returnează o listă de cereri extrase (una per tip de produs menționat), fiecare cu câmpurile schemei completate cât mai mult posibil.
+
+Rutele noi din `web/app.py` leagă cele două componente de UI. Nu există proces separat de polling.
 
 ### Fișiere noi
 
 ```
 email_agent/
 ├── __init__.py
-├── gmail_client.py      # Autentificare OAuth2 + Gmail API: listare/citire/trimitere mesaje
-├── email_parser.py      # Extragere subiect, corp, atașamente; clasificare LLM
-├── dispatcher.py        # Rutare spre Flow A sau Flow B; scriere rând email_jobs
-├── pdf_generator.py     # Randare HTML raport existent → PDF via WeasyPrint
-├── notifier.py          # Trimitere email de răspuns cu PDF atașat via Gmail API
-└── poller.py            # Loop de polling — punct de intrare (la fiecare 2 min)
-
-db/
-└── email_jobs.py        # CRUD pentru tabelul email_jobs
+├── gmail_client.py      # OAuth2 + fetch emails by date range
+└── email_extractor.py   # LLM: extrage cereri de produse din email
 
 web/
-├── app.py               # Adaugă GET /email-jobs + POST /email-jobs/{id}/retry
 └── templates/
-    └── email_jobs.html  # Panou de monitorizare
+    └── email_requests.html  # Lista de cereri extrase
 ```
 
 ### Fișiere existente modificate
 
 | Fișier | Modificare |
 |---|---|
-| `db/schema.sql` | Adaugă tabelul `email_jobs` |
-| `requirements.txt` | Adaugă `google-auth-oauthlib`, `google-api-python-client`, `weasyprint` |
-| `web/templates/base.html` | Adaugă link de navigare către Email Jobs |
+| `web/app.py` | Adaugă `POST /email-agent/fetch` și `POST /email-agent/create-session` |
+| `web/templates/index.html` | Adaugă câmpuri dată + buton deasupra celor două carduri existente |
+| `requirements.txt` | Adaugă `google-auth-oauthlib>=1.2`, `google-api-python-client>=2.120` |
 | `.gitignore` | Adaugă `gmail_token.json`, `credentials.json` |
+
+---
+
+## Fluxul complet
+
+```
+Angajat completează "De la" + "Până la" → apasă "Verifică cereri pe e-mail"
+  └─ POST /email-agent/fetch {date_start, date_end}
+       └─ gmail_client.fetch_emails(date_start, date_end) → listă EmailMessage
+            └─ pentru fiecare email:
+                 email_extractor.extract(email) → listă ProductRequest
+                 (un email cu 3 tipuri de produse → 3 ProductRequest)
+       └─ returnează HTML cu lista de cereri grupate pe email sursă
+
+Angajat dă click pe o cerere
+  └─ POST /email-agent/create-session {product_type, prefilled_state_json}
+       └─ repository.create_session(conn, product_type, description)
+       └─ repository.update_session_state(conn, sid, prefilled_state, ...)
+       └─ redirect → GET /sessions/{sid}  (interfața Discovery existentă, câmpuri pre-completate)
+```
 
 ---
 
 ## Model de date
 
-### Tabelul `email_jobs`
+### `ProductRequest` (obiect în memorie, nu în DB)
 
-```sql
-CREATE TABLE email_jobs (
-    id                TEXT PRIMARY KEY,
-    gmail_message_id  TEXT UNIQUE NOT NULL,   -- ID mesaj Gmail pentru deduplicare
-    sender_email      TEXT NOT NULL,
-    subject           TEXT,
-    flow_type         TEXT,                   -- discovery | match | unclear | spam
-    status            TEXT NOT NULL DEFAULT 'pending',
-                                              -- pending | processing | done
-                                              -- failed | needs_clarification | spam
-    session_id        TEXT,                   -- FK → discovery_sessions sau match_sessions
-    error_message     TEXT,
-    received_at       DATETIME NOT NULL,
-    processed_at      DATETIME
-);
+```python
+@dataclass
+class ProductRequest:
+    email_sender: str        # expeditor email
+    email_subject: str       # subiect email
+    email_date: str          # data primirii
+    product_type: str        # ex. "tricou", "hanorac" — cheie din schemas/
+    prefilled_state: dict    # câmpurile extrase; câmpurile necunoscute lipsesc sau sunt null
+    description: str         # descrierea brută din email pentru acest produs
 ```
 
-`gmail_message_id` are constrângere UNIQUE — poller-ul verifică acest câmp înainte de procesare pentru a preveni procesarea dublă la repornire sau suprapunere.
+Nu se adaugă tabele noi în DB. Sesiunile Discovery create sunt identice cu cele create manual — același tabel `discovery_sessions`, același flux.
 
 ---
 
-## Fluxul de procesare email
+## Extragere LLM (`email_extractor.py`)
 
-```
-poller.py (la fiecare 2 min)
-  └─ gmail_client.list_unread()
-       └─ pentru fiecare mesaj:
-            sari dacă gmail_message_id există deja în email_jobs (deduplicare)
-            inserează rând email_jobs (status=pending)
-            email_parser.classify(mesaj) → {flow_type, description, atașamente}
-            dacă spam:
-                actualizează status=spam, gata
-            dacă unclear:
-                notifier.send_clarification(expeditor)
-                actualizează status=needs_clarification, gata
-            dacă flow_type == "discovery":
-                dispatcher.run_discovery(descriere) → session_id, report_id
-                pdf_generator.render(report_id) → pdf_bytes
-                notifier.send_report(expeditor, pdf_bytes)
-                actualizează status=done
-            dacă flow_type == "match":
-                dispatcher.run_match(atașamente) → match_id, report_id
-                pdf_generator.render(report_id) → pdf_bytes
-                notifier.send_report(expeditor, pdf_bytes)
-                actualizează status=done
-            la eroare LLM: retry ×2 cu backoff; dacă tot eșuează → status=failed
-```
+LLM-ul primește:
+- Corpul emailului (text)
+- Lista de tipuri de produse disponibile în aplicație (din `schemas/loader.available_product_types()`)
+- Schema completă a fiecărui tip de produs identificat (câmpurile disponibile)
 
-### Prompt clasificare LLM (email_parser.py)
-
-Claude primește subiectul emailului + textul corpului + lista numelor de fișiere/tipuri MIME ale atașamentelor. Returnează un obiect JSON:
+LLM-ul returnează un array JSON, câte un obiect per tip de produs menționat:
 
 ```json
-{
-  "flow_type": "discovery" | "match" | "unclear" | "spam",
-  "description": "<descriere produs extrasă dacă flow_type=discovery>",
-  "mockup_attachment": "<nume fișier dacă flow_type=match>",
-  "real_photo_attachment": "<nume fișier sau null>"
-}
+[
+  {
+    "product_type": "tricou",
+    "description": "tricou polo cu broderie ECJ, font Bion Wide, 6 cm, culoare navy",
+    "prefilled_state": {
+      "tip_produs": "polo",
+      "culoare": "navy",
+      "branding": {
+        "tehnica": "broderie",
+        "text": "ECJ",
+        "font": "Bion Wide",
+        "dimensiune_cm": 6
+      }
+    }
+  },
+  {
+    "product_type": "hanorac",
+    "description": "hanorace simple fără personalizare",
+    "prefilled_state": {
+      "tip_produs": "hanorac"
+    }
+  }
+]
 ```
 
-Dacă `flow_type=unclear`, agentul trimite un email de clarificare șablon care explică ce informații sunt necesare.
+Câmpurile pe care LLM-ul nu le poate extrage din email lipsesc din `prefilled_state` (nu se inventează valori).
 
 ---
 
-## Autentificare
+## UI — modificări pe pagina principală
 
-Gmail API folosește OAuth2:
+Deasupra celor două carduri existente („Am o descriere" / „Am un mockup"), se adaugă o secțiune:
 
-1. Dezvoltatorul creează un proiect Google Cloud, activează Gmail API, descarcă `credentials.json`
-2. La primul run al `poller.py`, browserul se deschide pentru autorizare unică; token-ul se salvează în `gmail_token.json` (în gitignore)
-3. La rulările ulterioare: token-ul se reîmprospătează automat via `google-auth-oauthlib`
-4. Calea către `credentials.json` se configurează prin `.env` (`GMAIL_CREDENTIALS_PATH`)
+```
+┌─────────────────────────────────────────────────────┐
+│  Verifică cereri pe e-mail                          │
+│  De la: [____/____/______]  Până la: [____/____/____]│
+│                        [Verifică cereri pe e-mail]  │
+└─────────────────────────────────────────────────────┘
 
-Agentul trimite răspunsuri de pe aceeași adresă Gmail din care citește ("send as" via Gmail API).
+── sau ──
+
+[Am o descriere]    [Am un mockup]
+```
+
+După apăsarea butonului, lista de cereri apare pe aceeași pagină (HTMX swap) sau pe o pagină dedicată `/email-requests`.
+
+Fiecare rând din listă afișează:
+- Expeditor + dată email
+- Tip produs
+- Sumar câmpuri extrase (ex. „broderie ECJ · font Bion Wide · culoare navy")
+- Buton „Deschide sesiune"
+
+---
+
+## Autentificare Gmail
+
+Identic cu v1:
+
+1. Developer creează proiect Google Cloud, activează Gmail API, descarcă `credentials.json`
+2. La primul acces pe ruta `/email-agent/fetch`, dacă `gmail_token.json` lipsește → redirect către OAuth2 flow (browser)
+3. Token salvat în `gmail_token.json` (gitignored), reîmprospătat automat
+4. `GMAIL_CREDENTIALS_PATH` configurat în `.env`
+
+Scopes necesare: `gmail.readonly` (nu mai avem nevoie de `gmail.send`).
 
 ---
 
@@ -158,50 +191,27 @@ Agentul trimite răspunsuri de pe aceeași adresă Gmail din care citește ("sen
 
 | Scenariu | Comportament |
 |---|---|
-| Emailul nu poate fi clasificat | Răspuns cu email de clarificare; status → `needs_clarification` |
-| Email spam/irelevant | Ignorat silențios; status → `spam`; niciun răspuns trimis |
-| Atașament corupt / format nesuportat | Răspuns la expeditor cu eroarea specifică; status → `failed` |
-| Timeout LLM / limită de rată | Retry ×2 cu backoff exponențial; dacă toate eșuează → status → `failed` |
-| Gmail API indisponibil | Eroarea se loghează; poller-ul continuă la ciclul următor fără crash |
-| Mesaj duplicat (repornire/suprapunere) | Sărit prin verificarea UNIQUE pe `gmail_message_id` |
+| Gmail API indisponibil | Eroare 502 cu mesaj prietenos în UI |
+| Token expirat / lipsă | Redirect către re-autentificare OAuth2 |
+| Email fără conținut text | Cererea e omisă silențios din rezultate |
+| LLM nu poate extrage niciun produs | Rândul apare în listă cu mesaj „Nu s-au putut extrage produse" |
+| Interval de date gol (niciun email) | Mesaj „Niciun email găsit în intervalul selectat" |
 
 ---
 
-## Panoul de monitorizare pentru operatori
+## Testare
 
-`GET /email-jobs` — tabel paginat cu toate job-urile email, cele mai noi primele.
-
-Coloane: expeditor, subiect, tip flow, status (codificat cu culori), timestamp primit, timestamp procesat, link la raport (dacă done), buton retry (dacă failed).
-
-Contoare sumar în partea de sus: Procesate / Necesită clarificare / Eșuate.
-
-`POST /email-jobs/{id}/retry` — repune în coadă un job eșuat pentru reprocesare imediată.
-
----
-
-## Generare PDF
-
-`pdf_generator.py` randează șablonul Jinja2 de raport existent (același HTML folosit în browser) în bytes PDF folosind **WeasyPrint**. PDF-ul este atașat emailului de răspuns cu numele fișierului `raport-ciptronic-{report_id}.pdf`.
-
-WeasyPrint necesită ca CSS-ul static al raportului să fie inclus sau referit ca căi absolute — generatorul transmite `base_url` care indică directorul `web/static/`.
-
----
-
-## Strategie de testare
-
-Gmail API este mereu mock-uit în teste — `gmail_client.py` expune o interfață clară; testele injectează un fake care returnează payload-uri de email construite manual. Același pattern ca mock-ul `LLMClient` existent.
+Gmail API este mereu mock-uit în teste prin același pattern `_FakeGmail` (analog `_FakeLLM` existent).
 
 | Test | Verifică |
 |---|---|
-| `test_parser_flow_a` | Email doar cu text → clasificat `discovery`, descrierea extrasă |
-| `test_parser_flow_b` | Email cu imagine atașată → clasificat `match`, atașamentul salvat |
-| `test_parser_unclear` | Email ambiguu → status `unclear`, email de clarificare trimis |
-| `test_parser_spam` | Email irelevant → ignorat, niciun răspuns trimis |
-| `test_dispatcher_creates_session` | Dispatcher-ul scrie rândul corect în DB pentru Flow A și Flow B |
-| `test_deduplication` | Același `gmail_message_id` procesat de două ori → al doilea ignorat |
-| `test_llm_retry` | LLM eșuează o dată → retry automat, al doilea apel reușește |
-| `test_pdf_generated` | PDF-ul generat are bytes valizi și non-goi |
-| `test_email_jobs_panel` | `GET /email-jobs` returnează 200 și listează job-urile din DB |
+| `test_fetch_emails_in_range` | `gmail_client.fetch_emails(start, end)` returnează doar emailurile din interval |
+| `test_extract_single_product` | Email cu un singur produs → lista cu un `ProductRequest` |
+| `test_extract_multiple_products` | Email cu 3 tipuri → lista cu 3 `ProductRequest` |
+| `test_extract_partial_fields` | Câmpurile nedescrise lipsesc din `prefilled_state`, nu sunt null/inventate |
+| `test_create_session_from_request` | `POST /email-agent/create-session` creează sesiune în DB cu starea pre-completată și redirect |
+| `test_fetch_route_returns_list` | `POST /email-agent/fetch` returnează 200 cu lista de cereri în HTML |
+| `test_fetch_route_empty_interval` | Niciun email în interval → mesaj corespunzător |
 
 ---
 
@@ -210,13 +220,4 @@ Gmail API este mereu mock-uit în teste — `gmail_client.py` expune o interfaț
 ```
 google-auth-oauthlib>=1.2
 google-api-python-client>=2.120
-weasyprint>=62.0
 ```
-
----
-
-## În afara scopului
-
-- Webhook push (Gmail Pub/Sub) — poate fi adăugat ulterior prin înlocuirea `poller.py` cu un endpoint `POST /gmail-webhook`; toate celelalte module rămân neschimbate
-- Threading email (răspunsuri de la clienți la emailurile de clarificare) — amânat
-- Atașamente multiple în Flow B (mai multe mockup-uri într-un singur email) — amânat; MVP gestionează doar prima imagine
