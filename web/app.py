@@ -21,6 +21,8 @@ load_dotenv()
 from agents import discovery, inspector
 from agents.llm_client import LLMClient
 from db import repository
+from email_agent.gmail_client import GmailClient
+from email_agent import email_extractor
 from image_matcher.engine import analyze_sim, compare_real
 from schemas import loader
 
@@ -37,6 +39,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 MAX_ROUNDS = 5
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 _llm_singleton: Any = None
+_gmail_singleton: Any = None
 
 
 def get_llm_client() -> Any:
@@ -45,6 +48,14 @@ def get_llm_client() -> Any:
     if _llm_singleton is None:
         _llm_singleton = LLMClient()
     return _llm_singleton
+
+
+def get_gmail_client() -> Any:
+    """Lazily build a singleton GmailClient. Tests patch this function."""
+    global _gmail_singleton
+    if _gmail_singleton is None:
+        _gmail_singleton = GmailClient()
+    return _gmail_singleton
 
 
 app = FastAPI(title="Ciptronic Product Validator")
@@ -658,3 +669,64 @@ def view_match_report(match_id: str, request: Request):
             "real_image_url": f"/matches/{match_id}/image/real",
         },
     )
+
+
+@app.post("/email-agent/fetch", response_class=HTMLResponse)
+def email_agent_fetch(
+    request: Request,
+    date_start: str = Form(...),
+    date_end: str = Form(...),
+):
+    gmail = get_gmail_client()
+    messages = gmail.fetch_emails(date_start, date_end)
+
+    if not messages:
+        return TEMPLATES.TemplateResponse(
+            request, "email_requests.html",
+            {"groups": [], "date_start": date_start, "date_end": date_end},
+        )
+
+    llm = get_llm_client()
+    groups = []
+    for msg in messages:
+        extracted = email_extractor.extract(msg, llm)
+        if extracted:
+            groups.append({"email": msg, "requests": extracted})
+
+    return TEMPLATES.TemplateResponse(
+        request, "email_requests.html",
+        {"groups": groups, "date_start": date_start, "date_end": date_end},
+    )
+
+
+@app.post("/email-agent/create-session")
+def email_agent_create_session(
+    product_type: str = Form(...),
+    description: str = Form(...),
+    prefilled_state_json: str = Form(...),
+):
+    prefilled_state = json.loads(prefilled_state_json)
+    schema = loader.load_schema(product_type)
+
+    llm = get_llm_client()
+    system, user = discovery.build_messages(
+        schema=schema,
+        initial_description=description,
+        state=prefilled_state,
+        history=[],
+    )
+    raw = llm.complete_text(system=system, user=user)
+    step = discovery.parse_response(raw)
+
+    merged_state = discovery.merge_answers(prefilled_state, step.state)
+
+    with get_conn() as conn:
+        sid = repository.create_session(conn, product_type, description)
+        history = [{"round": 1, "questions": step.intrebari, "answers": None}]
+        repository.update_session_state(conn, sid, merged_state, history, rounds=1)
+        if step.done:
+            complete, _ = discovery.is_schema_complete(schema, merged_state)
+            if complete:
+                repository.finalize_session(conn, sid)
+
+    return Response(status_code=200, headers={"HX-Redirect": f"/sessions/{sid}"})

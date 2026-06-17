@@ -1,0 +1,40 @@
+{% if groups %}
+{% for group in groups %}
+<div class="email-group">
+  <div class="email-group__header">
+    <span class="email-group__sender">{{ group.email.sender }}</span>
+    <span class="email-group__subject">{{ group.email.subject }}</span>
+  </div>
+  {% for req in group.requests %}
+  <div class="request-card">
+    <span class="badge-product">{{ req.product_type }}</span>
+    <p class="request-card__desc">{{ req.description }}</p>
+    <div class="field-chips">
+      {% for key, val in req.prefilled_state.items() %}
+        {% if val is mapping %}
+          {% for k2, v2 in val.items() %}
+          <div class="chip"><span class="chip__key">{{ key }}.{{ k2 }}</span><span class="chip__val">{{ v2 }}</span></div>
+          {% endfor %}
+        {% else %}
+        <div class="chip"><span class="chip__key">{{ key }}</span><span class="chip__val">{{ val }}</span></div>
+        {% endif %}
+      {% endfor %}
+      {% for missing_key in req.missing_fields %}
+      <div class="chip chip--missing">{{ missing_key }} — necunoscut</div>
+      {% endfor %}
+    </div>
+    <form method="post" action="/email-agent/create-session">
+      <input type="hidden" name="product_type" value="{{ req.product_type }}">
+      <input type="hidden" name="description" value="{{ req.description }}">
+      <input type="hidden" name="prefilled_state_json" value="{{ req.prefilled_state | tojson }}">
+      <button type="submit" class="btn btn--primary">Deschide sesiune →</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<div class="email-results-empty">
+  Niciun email găsit în intervalul <strong>{{ date_start }} – {{ date_end }}</strong>.
+</div>
+{% endif %}
