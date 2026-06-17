@@ -677,7 +677,15 @@ def email_agent_fetch(
     date_start: str = Form(...),
     date_end: str = Form(...),
 ):
-    gmail = get_gmail_client()
+    try:
+        gmail = get_gmail_client()
+    except FileNotFoundError:
+        return HTMLResponse(
+            '<div class="email-results-empty">'
+            '<strong>Gmail neconfigurat.</strong> Adaugă <code>credentials.json</code> '
+            'în directorul proiectului și repornește serverul.'
+            '</div>'
+        )
     messages = gmail.fetch_emails(date_start, date_end)
 
     if not messages:
