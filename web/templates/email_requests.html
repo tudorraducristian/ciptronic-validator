@@ -1,29 +1,69 @@
 {% if groups %}
+<div class="email-results-summary">
+  {% set total_requests = namespace(count=0) %}
+  {% for g in groups %}{% set total_requests.count = total_requests.count + g.requests | length %}{% endfor %}
+  <span>✓ <strong>{{ total_requests.count }} cereri</strong> extrase</span>
+  <span>·</span>
+  <span><strong>{{ groups | length }} email{% if groups | length != 1 %}uri{% endif %}</strong> procesate</span>
+  <span>·</span>
+  <span>Câmpurile cunoscute sunt pre-completate — Discovery va întreba doar ce lipsește</span>
+</div>
+
 {% for group in groups %}
 <div class="email-group">
   <div class="email-group__header">
-    <span class="email-group__sender">{{ group.email.sender }}</span>
-    <span class="email-group__subject">{{ group.email.subject }}</span>
+    <div class="email-group__avatar">
+      {{ group.email.sender[:2] | upper }}
+    </div>
+    <div class="email-group__info">
+      <span class="email-group__sender">{{ group.email.sender }}</span>
+      <span class="email-group__subject">{{ group.email.subject }}</span>
+    </div>
+    <span class="email-group__date">{{ group.email.date }}</span>
   </div>
+
   {% for req in group.requests %}
   <div class="request-card">
-    <span class="badge-product">{{ req.product_type }}</span>
-    <p class="request-card__desc">{{ req.description }}</p>
-    <div class="field-chips">
-      {% for key, val in req.prefilled_state.items() %}
-        {% if val is mapping %}
-          {% for k2, v2 in val.items() %}
-          <div class="chip"><span class="chip__key">{{ key }}.{{ k2 }}</span><span class="chip__val">{{ v2 }}</span></div>
-          {% endfor %}
-        {% else %}
-        <div class="chip"><span class="chip__key">{{ key }}</span><span class="chip__val">{{ val }}</span></div>
-        {% endif %}
-      {% endfor %}
-      {% for missing_key in req.missing_fields %}
-      <div class="chip chip--missing">{{ missing_key }} — necunoscut</div>
-      {% endfor %}
+    <div>
+      <span class="badge-product">{{ req.product_type }}</span>
+      {% if group.requests | length > 1 %}
+      <span style="font-size:12px;color:var(--c-text-soft);margin-left:8px">
+        cerere {{ loop.index }} din {{ group.requests | length }}
+      </span>
+      {% endif %}
+
+      <p class="request-card__desc">„{{ req.description }}"</p>
+
+      <div class="field-chips">
+        {% for key, val in req.prefilled_state.items() %}
+          {% if val is mapping %}
+            {% for k2, v2 in val.items() %}
+            <div class="chip">
+              <span class="chip__key">{{ key }}.{{ k2 }}</span>
+              <span class="chip__val">
+                {%- if v2 is iterable and v2 is not string %}{{ v2 | join(', ') }}{%- else %}{{ v2 }}{%- endif %}
+              </span>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div class="chip">
+            <span class="chip__key">{{ key }}</span>
+            <span class="chip__val">
+              {%- if val is iterable and val is not string %}{{ val | join(', ') }}{%- else %}{{ val }}{%- endif %}
+            </span>
+          </div>
+          {% endif %}
+        {% endfor %}
+
+        {% for missing_key in req.missing_fields %}
+        <div class="chip chip--missing">{{ missing_key }} — necunoscut</div>
+        {% endfor %}
+      </div>
     </div>
-    <form method="post" action="/email-agent/create-session">
+
+    <form method="post" action="/email-agent/create-session"
+          hx-post="/email-agent/create-session"
+          hx-target="body">
       <input type="hidden" name="product_type" value="{{ req.product_type }}">
       <input type="hidden" name="description" value="{{ req.description }}">
       <input type="hidden" name="prefilled_state_json" value="{{ req.prefilled_state | tojson }}">
@@ -33,6 +73,7 @@
   {% endfor %}
 </div>
 {% endfor %}
+
 {% else %}
 <div class="email-results-empty">
   Niciun email găsit în intervalul <strong>{{ date_start }} – {{ date_end }}</strong>.
