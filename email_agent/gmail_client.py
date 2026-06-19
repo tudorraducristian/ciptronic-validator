@@ -106,7 +106,7 @@ class GmailClient:
 
         image_paths: list[str] = []
         if images_ref and self.image_save_dir:
-            save_dir = Path(self.image_save_dir) / msg_id
+            save_dir = Path(self.image_save_dir) / Path(msg_id).name
             save_dir.mkdir(parents=True, exist_ok=True)
             for idx, img_bytes in enumerate(images_ref):
                 path = save_dir / f"{idx:02d}.jpg"
@@ -126,9 +126,9 @@ class GmailClient:
     def _walk_parts(
         self,
         payload: dict,
-        body_ref: list,
-        images_ref: list,
-        names_ref: list,
+        body_ref: list[str],
+        images_ref: list[bytes],
+        names_ref: list[str],
         msg_id: str,
     ) -> None:
         mime = payload.get("mimeType", "")

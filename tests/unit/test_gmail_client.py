@@ -3,10 +3,9 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from PIL import Image
 
-from email_agent.gmail_client import EmailMessage, GmailClient, _resize_image
+from email_agent.gmail_client import GmailClient, _resize_image
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
