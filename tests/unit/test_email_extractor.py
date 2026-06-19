@@ -121,3 +121,91 @@ def test_prompt_includes_schema_fields():
     assert len(calls) == 1
     assert "culoare_principala" in calls[0]
     assert "branding.tehnica" in calls[0]
+
+
+# ── ramura vision ─────────────────────────────────────────────────────────────
+
+import base64 as _base64
+from io import BytesIO as _BytesIO
+from pathlib import Path as _Path
+
+from PIL import Image as _Image
+
+
+class _FakeLLMBoth:
+    """FakeLLM care înregistrează ambele tipuri de apeluri."""
+    def __init__(self, response: str):
+        self._response = response
+        self.text_calls: list = []
+        self.vision_calls: list = []
+
+    def complete_text(self, system: str, user: str) -> str:
+        self.text_calls.append((system, user))
+        return self._response
+
+    def complete_vision(self, system: str, content_blocks: list) -> str:
+        self.vision_calls.append((system, content_blocks))
+        return self._response
+
+
+def _jpeg_file(tmp_path, idx: int = 0) -> str:
+    buf = _BytesIO()
+    _Image.new("RGB", (10, 10), color=(255, 0, 0)).save(buf, format="JPEG")
+    path = _Path(tmp_path) / f"img{idx:02d}.jpg"
+    path.write_bytes(buf.getvalue())
+    return str(path)
+
+
+def _make_email_with_images(tmp_path, body: str = "tricou polo navy") -> EmailMessage:
+    return EmailMessage(
+        gmail_id="gid-img",
+        sender="E-CABLAJE S.A. <office@ecablaje.ro>",
+        subject="Cerere produse",
+        body_text=body,
+        date="Mon, 10 Jun 2026 09:00:00 +0300",
+        image_paths=[_jpeg_file(tmp_path, 0)],
+    )
+
+
+def test_extract_uses_vision_when_images_present(tmp_path):
+    llm = _FakeLLMBoth('[{"product_type":"tricou","description":"polo","prefilled_state":{"culoare_principala":"navy"}}]')
+    requests = email_extractor.extract(_make_email_with_images(tmp_path), llm)
+    assert len(llm.vision_calls) == 1
+    assert len(llm.text_calls) == 0
+    assert len(requests) == 1
+
+
+def test_extract_uses_text_when_no_images():
+    llm = _FakeLLMBoth("[]")
+    msg = _make_email("test fara imagini")
+    email_extractor.extract(msg, llm)
+    assert len(llm.text_calls) == 1
+    assert len(llm.vision_calls) == 0
+
+
+def test_extract_vision_content_blocks_include_text_and_image(tmp_path):
+    llm = _FakeLLMBoth("[]")
+    email_extractor.extract(_make_email_with_images(tmp_path), llm)
+    _, content_blocks = llm.vision_calls[0]
+    types = [b["type"] for b in content_blocks]
+    assert "text" in types
+    assert "image" in types
+
+
+def test_extract_vision_includes_pdf_names_in_text(tmp_path):
+    llm = _FakeLLMBoth("[]")
+    msg = _make_email_with_images(tmp_path)
+    msg.other_attachment_names = ["Logo ECJ.pdf"]
+    email_extractor.extract(msg, llm)
+    _, content_blocks = llm.vision_calls[0]
+    text_block = next(b for b in content_blocks if b["type"] == "text")
+    assert "Logo ECJ.pdf" in text_block["text"]
+
+
+def test_extract_vision_image_block_is_base64_jpeg(tmp_path):
+    llm = _FakeLLMBoth("[]")
+    email_extractor.extract(_make_email_with_images(tmp_path), llm)
+    _, content_blocks = llm.vision_calls[0]
+    img_block = next(b for b in content_blocks if b["type"] == "image")
+    assert img_block["source"]["type"] == "base64"
+    assert img_block["source"]["media_type"] == "image/jpeg"

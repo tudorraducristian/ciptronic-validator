@@ -1,11 +1,13 @@
+import base64
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from email_agent.gmail_client import EmailMessage
 from schemas import loader
 
 
-SYSTEM_PROMPT = """Ești un asistent care extrage cereri de produse personalizate din emailuri de business.
+_SYSTEM_PROMPT_BASE = """Ești un asistent care extrage cereri de produse personalizate din emailuri de business.
 
 Emailurile sunt trimise de clienți care comandă produse textile personalizate.
 
@@ -18,10 +20,16 @@ Pentru fiecare cerere returnează un obiect JSON cu:
   folosind EXACT cheile din schema furnizată
 
 IMPORTANT:
-- Nu inventa valori. Dacă un câmp nu e menționat explicit în email, NU îl include.
+- Nu inventa valori. Dacă un câmp nu e menționat explicit în email sau imagini, NU îl include.
 - Folosește EXACT cheile din schema — nu traduce, nu redenumi.
 - Returnează un array JSON, chiar dacă e gol ([]).
 - Răspunde EXCLUSIV cu JSON valid, fără text suplimentar."""
+
+_SYSTEM_PROMPT_WITH_IMAGES = _SYSTEM_PROMPT_BASE + """
+
+Emailul conține imagini cu mockup-uri de produs. Folosește-le pentru a completa câmpurile vizuale: \
+culoare_principala, branding.pozitie, branding.culori. \
+Informațiile extrase din imagini au prioritate față de absența lor din text."""
 
 
 @dataclass
@@ -45,16 +53,40 @@ def extract(message: EmailMessage, llm) -> list[ProductRequest]:
         schemas_map[ptype] = schema
         schemas_text += f'\nSchema pentru "{ptype}":\n{_schema_to_text(schema)}\n'
 
-    user_content = json.dumps({
+    user_content_dict = {
         "tipuri_disponibile": available_types,
         "scheme": schemas_text,
         "expeditor": message.sender,
         "subiect": message.subject,
         "data": message.date,
         "corp_email": message.body_text[:3000],
-    }, ensure_ascii=False)
+    }
 
-    raw = llm.complete_text(system=SYSTEM_PROMPT, user=user_content)
+    if message.image_paths:
+        if message.other_attachment_names:
+            user_content_dict["fisiere_atasate"] = message.other_attachment_names
+        text_block = {"type": "text", "text": json.dumps(user_content_dict, ensure_ascii=False)}
+        image_blocks = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64.b64encode(Path(p).read_bytes()).decode(),
+                },
+            }
+            for p in message.image_paths
+        ]
+        raw = llm.complete_vision(
+            system=_SYSTEM_PROMPT_WITH_IMAGES,
+            content_blocks=[text_block] + image_blocks,
+        )
+    else:
+        raw = llm.complete_text(
+            system=_SYSTEM_PROMPT_BASE,
+            user=json.dumps(user_content_dict, ensure_ascii=False),
+        )
+
     items = _parse_json_array(raw)
 
     result = []
