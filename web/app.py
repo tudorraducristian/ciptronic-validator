@@ -772,7 +772,12 @@ def email_agent_create_session(
 
 @app.get("/email-agent/image/{gmail_id}/{idx}")
 def email_image(gmail_id: str, idx: int):
-    path = UPLOADS_DIR / "email_images" / gmail_id / f"{idx:02d}.jpg"
+    if idx < 0:
+        raise HTTPException(status_code=422, detail="Index invalid")
+    base = (UPLOADS_DIR / "email_images").resolve()
+    path = (base / gmail_id / f"{idx:02d}.jpg").resolve()
+    if not str(path).startswith(str(base) + "/"):
+        raise HTTPException(status_code=400, detail="Cale invalidă")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Imagine indisponibilă")
     return FileResponse(path)
