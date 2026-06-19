@@ -66,6 +66,18 @@ class GmailClient:
             Path(self.token_path).write_text(creds.to_json())
         return build("gmail", "v1", credentials=creds)
 
+    def _get_part_bytes(self, body: dict, msg_id: str) -> bytes | None:
+        data = body.get("data", "")
+        if data:
+            return base64.urlsafe_b64decode(data)
+        att_id = body.get("attachmentId")
+        if att_id:
+            att = self._service.users().messages().attachments().get(
+                userId="me", messageId=msg_id, id=att_id
+            ).execute()
+            return base64.urlsafe_b64decode(att.get("data", ""))
+        return None
+
     def get_address(self) -> str:
         """Email address of the authorized account (userId='me')."""
         profile = self._service.users().getProfile(userId="me").execute()

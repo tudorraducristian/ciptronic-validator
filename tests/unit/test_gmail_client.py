@@ -51,3 +51,42 @@ def test_resize_image_respects_custom_max_px():
     result = _resize_image(_png_bytes(2000, 1500), max_px=512)
     img = Image.open(BytesIO(result))
     assert max(img.size) <= 512
+
+
+# ── _get_part_bytes ───────────────────────────────────────────────────────────
+
+def test_get_part_bytes_inline_data():
+    client = _make_client()
+    raw = b"hello image bytes"
+    encoded = base64.urlsafe_b64encode(raw).decode()
+    result = client._get_part_bytes({"data": encoded}, "msg-1")
+    assert result == raw
+    client._service.users.return_value.messages.return_value.attachments.assert_not_called()
+
+
+def test_get_part_bytes_fetches_attachment_id():
+    client = _make_client()
+    raw = b"large image bytes"
+    encoded = base64.urlsafe_b64encode(raw).decode()
+    (
+        client._service.users.return_value
+        .messages.return_value
+        .attachments.return_value
+        .get.return_value
+        .execute.return_value
+    ) = {"data": encoded}
+
+    result = client._get_part_bytes({"attachmentId": "att-123"}, "msg-1")
+
+    assert result == raw
+    (
+        client._service.users.return_value
+        .messages.return_value
+        .attachments.return_value
+        .get.assert_called_once_with(userId="me", messageId="msg-1", id="att-123")
+    )
+
+
+def test_get_part_bytes_returns_none_when_empty():
+    client = _make_client()
+    assert client._get_part_bytes({}, "msg-1") is None
