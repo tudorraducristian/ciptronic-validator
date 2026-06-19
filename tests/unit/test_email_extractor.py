@@ -1,3 +1,8 @@
+from io import BytesIO
+from pathlib import Path
+
+from PIL import Image
+
 from email_agent.gmail_client import EmailMessage
 from email_agent import email_extractor
 
@@ -125,12 +130,6 @@ def test_prompt_includes_schema_fields():
 
 # ── ramura vision ─────────────────────────────────────────────────────────────
 
-import base64 as _base64
-from io import BytesIO as _BytesIO
-from pathlib import Path as _Path
-
-from PIL import Image as _Image
-
 
 class _FakeLLMBoth:
     """FakeLLM care înregistrează ambele tipuri de apeluri."""
@@ -149,9 +148,9 @@ class _FakeLLMBoth:
 
 
 def _jpeg_file(tmp_path, idx: int = 0) -> str:
-    buf = _BytesIO()
-    _Image.new("RGB", (10, 10), color=(255, 0, 0)).save(buf, format="JPEG")
-    path = _Path(tmp_path) / f"img{idx:02d}.jpg"
+    buf = BytesIO()
+    Image.new("RGB", (10, 10), color=(255, 0, 0)).save(buf, format="JPEG")
+    path = Path(tmp_path) / f"img{idx:02d}.jpg"
     path.write_bytes(buf.getvalue())
     return str(path)
 

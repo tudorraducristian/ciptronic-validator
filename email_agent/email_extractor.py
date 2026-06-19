@@ -1,10 +1,17 @@
 import base64
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 from email_agent.gmail_client import EmailMessage
 from schemas import loader
+
+
+class LLMClient(Protocol):
+    def complete_text(self, system: str, user: str) -> str: ...
+    def complete_vision(self, system: str, content_blocks: list[dict]) -> str: ...
 
 
 _SYSTEM_PROMPT_BASE = """Ești un asistent care extrage cereri de produse personalizate din emailuri de business.
@@ -43,7 +50,20 @@ class ProductRequest:
     missing_fields: list[str] = field(default_factory=list)
 
 
-def extract(message: EmailMessage, llm) -> list[ProductRequest]:
+def _image_block(path: str) -> dict | None:
+    try:
+        data = base64.b64encode(Path(path).read_bytes()).decode()
+    except OSError as exc:
+        logging.warning("Imagine inaccesibilă, omisă: %s — %s", path, exc)
+        return None
+    # Always JPEG: _resize_image in gmail_client re-encodes every image to JPEG before saving
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": "image/jpeg", "data": data},
+    }
+
+
+def extract(message: EmailMessage, llm: LLMClient) -> list[ProductRequest]:
     available_types = loader.available_product_types()
 
     schemas_text = ""
@@ -66,17 +86,7 @@ def extract(message: EmailMessage, llm) -> list[ProductRequest]:
         if message.other_attachment_names:
             user_content_dict["fisiere_atasate"] = message.other_attachment_names
         text_block = {"type": "text", "text": json.dumps(user_content_dict, ensure_ascii=False)}
-        image_blocks = [
-            {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/jpeg",
-                    "data": base64.b64encode(Path(p).read_bytes()).decode(),
-                },
-            }
-            for p in message.image_paths
-        ]
+        image_blocks = [b for p in message.image_paths if (b := _image_block(p)) is not None]
         raw = llm.complete_vision(
             system=_SYSTEM_PROMPT_WITH_IMAGES,
             content_blocks=[text_block] + image_blocks,
