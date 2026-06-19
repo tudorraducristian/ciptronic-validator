@@ -45,3 +45,9 @@ def test_resize_image_small_image_not_upscaled():
     result = _resize_image(_png_bytes(100, 80))
     img = Image.open(BytesIO(result))
     assert img.size == (100, 80)
+
+
+def test_resize_image_respects_custom_max_px():
+    result = _resize_image(_png_bytes(2000, 1500), max_px=512)
+    img = Image.open(BytesIO(result))
+    assert max(img.size) <= 512

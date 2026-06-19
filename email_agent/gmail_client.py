@@ -29,8 +29,14 @@ class EmailMessage:
 def _resize_image(data: bytes, max_px: int = 1024) -> bytes:
     img = Image.open(io.BytesIO(data))
     img.thumbnail((max_px, max_px), Image.LANCZOS)
+    if img.mode in ("RGBA", "LA", "P"):
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        bg.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[-1])
+        img = bg
+    else:
+        img = img.convert("RGB")
     out = io.BytesIO()
-    img.convert("RGB").save(out, format="JPEG", quality=85)
+    img.save(out, format="JPEG", quality=85)
     return out.getvalue()
 
 
@@ -40,6 +46,7 @@ class GmailClient:
         default_factory=lambda: os.environ.get("GMAIL_CREDENTIALS_PATH", "credentials.json")
     )
     token_path: str = "gmail_token.json"
+    image_save_dir: str | None = None
 
     def __post_init__(self):
         self._service = self._build_service()
@@ -68,12 +75,10 @@ class GmailClient:
         """Returnează emailurile primite între date_start și date_end (format YYYY-MM-DD)."""
         end_exclusive = (date.fromisoformat(date_end) + timedelta(days=1)).strftime("%Y/%m/%d")
         query = f"after:{date_start.replace('-', '/')} before:{end_exclusive}"
-        import logging; logging.warning(f"[GmailClient] query={query!r}")
         result = self._service.users().messages().list(
             userId="me", q=query
         ).execute()
         messages = result.get("messages", [])
-        import logging; logging.warning(f"[GmailClient] messages={messages}")
         return [self._fetch_and_parse(m["id"]) for m in messages]
 
     def _fetch_and_parse(self, msg_id: str) -> EmailMessage:
