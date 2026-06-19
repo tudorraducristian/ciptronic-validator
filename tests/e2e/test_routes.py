@@ -7,6 +7,19 @@ def test_landing_page_is_chooser(client):
     assert "/matches/new" in r.text
 
 
+def test_email_dates_default_to_previous_week(client):
+    import re
+    from datetime import date, timedelta
+    r = client.get("/")
+    start = re.search(r'name="date_start" value="(\d{4}-\d{2}-\d{2})"', r.text)
+    end = re.search(r'name="date_end" value="(\d{4}-\d{2}-\d{2})"', r.text)
+    assert start and end, "both date inputs should carry a default value"
+    d_start = date.fromisoformat(start.group(1))
+    d_end = date.fromisoformat(end.group(1))
+    assert d_end == date.today()
+    assert (d_end - d_start).days == 7
+
+
 def test_sessions_new_page_renders_form(client):
     r = client.get("/sessions/new")
     assert r.status_code == 200
