@@ -1332,3 +1332,19 @@ a:hover { color: var(--c-accent); }
   color: var(--c-text-soft);
   font-size: 14px;
 }
+
+/* ── email thumbnails ───────────────────────────────────────────── */
+.email-group__thumbs {
+  display: flex;
+  gap: var(--s-1);
+  margin-top: var(--s-2);
+}
+.email-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--c-border);
+  cursor: pointer;
+}
+.email-thumb:hover { opacity: 0.85; }
