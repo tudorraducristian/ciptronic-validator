@@ -98,24 +98,58 @@ class GmailClient:
             userId="me", id=msg_id, format="full"
         ).execute()
         headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
-        body_ref = [""]
-        self._walk_parts(msg["payload"], body_ref)
+
+        body_ref: list[str] = [""]
+        images_ref: list[bytes] = []
+        names_ref: list[str] = []
+        self._walk_parts(msg["payload"], body_ref, images_ref, names_ref, msg_id)
+
+        image_paths: list[str] = []
+        if images_ref and self.image_save_dir:
+            save_dir = Path(self.image_save_dir) / msg_id
+            save_dir.mkdir(parents=True, exist_ok=True)
+            for idx, img_bytes in enumerate(images_ref):
+                path = save_dir / f"{idx:02d}.jpg"
+                path.write_bytes(img_bytes)
+                image_paths.append(str(path))
+
         return EmailMessage(
             gmail_id=msg_id,
             sender=headers.get("From", ""),
             subject=headers.get("Subject", ""),
             body_text=body_ref[0],
             date=headers.get("Date", ""),
+            image_paths=image_paths,
+            other_attachment_names=names_ref,
         )
 
-    def _walk_parts(self, payload: dict, body_ref: list) -> None:
+    def _walk_parts(
+        self,
+        payload: dict,
+        body_ref: list,
+        images_ref: list,
+        names_ref: list,
+        msg_id: str,
+    ) -> None:
         mime = payload.get("mimeType", "")
+        body = payload.get("body", {})
+
         if mime == "text/plain" and not payload.get("filename"):
-            data = payload.get("body", {}).get("data", "")
+            data = body.get("data", "")
             if data:
                 body_ref[0] += base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
+
+        elif mime.startswith("image/"):
+            raw = self._get_part_bytes(body, msg_id)
+            if raw:
+                images_ref.append(_resize_image(raw))
+
+        elif mime == "application/pdf" or (payload.get("filename") or "").lower().endswith(".pdf"):
+            fn = payload.get("filename") or "document.pdf"
+            names_ref.append(fn)
+
         for part in payload.get("parts", []):
-            self._walk_parts(part, body_ref)
+            self._walk_parts(part, body_ref, images_ref, names_ref, msg_id)
 
 
 def authorized_address(token_path: str = "gmail_token.json") -> str | None:

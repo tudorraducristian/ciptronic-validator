@@ -90,3 +90,137 @@ def test_get_part_bytes_fetches_attachment_id():
 def test_get_part_bytes_returns_none_when_empty():
     client = _make_client()
     assert client._get_part_bytes({}, "msg-1") is None
+
+
+# ── _walk_parts ───────────────────────────────────────────────────────────────
+
+def _b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode()
+
+
+def test_walk_parts_collects_text():
+    client = _make_client()
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {"mimeType": "text/plain", "body": {"data": _b64(b"hello email")}, "filename": None},
+        ],
+    }
+    body_ref, images_ref, names_ref = [""], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    assert body_ref[0] == "hello email"
+
+
+def test_walk_parts_collects_image():
+    client = _make_client()
+    raw_img = _png_bytes(50, 50)
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {
+                "mimeType": "image/jpeg",
+                "filename": "test.jpg",
+                "body": {"data": _b64(raw_img)},
+            },
+        ],
+    }
+    body_ref, images_ref, names_ref = [""], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    assert len(images_ref) == 1
+    img = Image.open(BytesIO(images_ref[0]))
+    assert img.format == "JPEG"
+
+
+def test_walk_parts_collects_pdf_name():
+    client = _make_client()
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {"mimeType": "application/pdf", "filename": "logo.pdf", "body": {}},
+        ],
+    }
+    body_ref, images_ref, names_ref = [""], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    assert names_ref == ["logo.pdf"]
+    assert images_ref == []
+
+
+def test_walk_parts_ignores_image_without_data():
+    client = _make_client()
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {"mimeType": "image/jpeg", "filename": "empty.jpg", "body": {}},
+        ],
+    }
+    body_ref, images_ref, names_ref = [""], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    assert images_ref == []
+
+
+# ── _fetch_and_parse ──────────────────────────────────────────────────────────
+
+def _gmail_message_payload(text: bytes, img_bytes: bytes | None = None) -> dict:
+    parts = [{"mimeType": "text/plain", "body": {"data": _b64(text)}}]
+    if img_bytes:
+        parts.append({
+            "mimeType": "image/jpeg",
+            "filename": "mock.jpg",
+            "body": {"data": _b64(img_bytes)},
+        })
+    return {
+        "payload": {
+            "mimeType": "multipart/mixed",
+            "headers": [
+                {"name": "From", "value": "sender@example.com"},
+                {"name": "Subject", "value": "Test subject"},
+                {"name": "Date", "value": "Mon, 10 Jun 2026 09:00:00 +0300"},
+            ],
+            "parts": parts,
+        }
+    }
+
+
+def test_fetch_and_parse_no_images(tmp_path):
+    client = _make_client(image_save_dir=str(tmp_path / "email_images"))
+    (
+        client._service.users.return_value
+        .messages.return_value
+        .get.return_value
+        .execute.return_value
+    ) = _gmail_message_payload(b"corpo email")
+
+    msg = client._fetch_and_parse("msg-123")
+
+    assert msg.body_text == "corpo email"
+    assert msg.image_paths == []
+
+
+def test_fetch_and_parse_saves_images(tmp_path):
+    client = _make_client(image_save_dir=str(tmp_path / "email_images"))
+    (
+        client._service.users.return_value
+        .messages.return_value
+        .get.return_value
+        .execute.return_value
+    ) = _gmail_message_payload(b"corpo email", _png_bytes(50, 50))
+
+    msg = client._fetch_and_parse("msg-123")
+
+    assert len(msg.image_paths) == 1
+    assert Path(msg.image_paths[0]).is_file()
+    assert "msg-123" in msg.image_paths[0]
+
+
+def test_fetch_and_parse_no_save_when_dir_is_none():
+    client = _make_client(image_save_dir=None)
+    (
+        client._service.users.return_value
+        .messages.return_value
+        .get.return_value
+        .execute.return_value
+    ) = _gmail_message_payload(b"corpo email", _png_bytes(50, 50))
+
+    msg = client._fetch_and_parse("msg-123")
+
+    assert msg.image_paths == []
