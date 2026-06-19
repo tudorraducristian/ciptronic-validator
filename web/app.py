@@ -2,8 +2,9 @@ import io
 import json
 import os
 import sqlite3
-from pathlib import Path
 from contextlib import contextmanager
+from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -21,7 +22,7 @@ load_dotenv()
 from agents import discovery, inspector
 from agents.llm_client import LLMClient
 from db import repository
-from email_agent.gmail_client import GmailClient
+from email_agent.gmail_client import GmailClient, authorized_address
 from email_agent import email_extractor
 from image_matcher.engine import analyze_sim, compare_real
 from schemas import loader
@@ -58,8 +59,19 @@ def get_gmail_client() -> Any:
     """Lazily build a singleton GmailClient. Tests patch this function."""
     global _gmail_singleton
     if _gmail_singleton is None:
-        _gmail_singleton = GmailClient()
+        _gmail_singleton = GmailClient(
+            image_save_dir=str(UPLOADS_DIR / "email_images")
+        )
     return _gmail_singleton
+
+
+def connected_email() -> str | None:
+    """Best-effort Gmail address already authorized (None if not yet / on error).
+    Never triggers interactive OAuth; patchable in tests."""
+    try:
+        return authorized_address()
+    except Exception:
+        return None
 
 
 app = FastAPI(title="Ciptronic Product Validator")
@@ -107,7 +119,16 @@ def _startup() -> None:
 
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    return TEMPLATES.TemplateResponse(request, "index.html")
+    today = date.today()
+    return TEMPLATES.TemplateResponse(
+        request, "index.html",
+        {
+            "connected_email": connected_email(),
+            # Default the e-mail interval to the previous week (today-7 → today).
+            "default_date_start": (today - timedelta(days=7)).isoformat(),
+            "default_date_end": today.isoformat(),
+        },
+    )
 
 
 @app.get("/sessions/new", response_class=HTMLResponse)
@@ -692,10 +713,15 @@ def email_agent_fetch(
         )
     messages = gmail.fetch_emails(date_start, date_end)
 
+    try:
+        account = gmail.get_address()
+    except Exception:
+        account = None
+
     if not messages:
         return TEMPLATES.TemplateResponse(
             request, "email_requests.html",
-            {"groups": [], "date_start": date_start, "date_end": date_end},
+            {"groups": [], "date_start": date_start, "date_end": date_end, "account": account},
         )
 
     llm = get_llm_client()
@@ -707,7 +733,7 @@ def email_agent_fetch(
 
     return TEMPLATES.TemplateResponse(
         request, "email_requests.html",
-        {"groups": groups, "date_start": date_start, "date_end": date_end},
+        {"groups": groups, "date_start": date_start, "date_end": date_end, "account": account},
     )
 
 
@@ -742,3 +768,11 @@ def email_agent_create_session(
                 repository.finalize_session(conn, sid)
 
     return Response(status_code=200, headers={"HX-Redirect": f"/sessions/{sid}"})
+
+
+@app.get("/email-agent/image/{gmail_id}/{idx}")
+def email_image(gmail_id: str, idx: int):
+    path = UPLOADS_DIR / "email_images" / gmail_id / f"{idx:02d}.jpg"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Imagine indisponibilă")
+    return FileResponse(path)
