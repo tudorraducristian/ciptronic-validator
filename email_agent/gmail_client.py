@@ -1,9 +1,12 @@
 import base64
 import io
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -112,6 +115,11 @@ class GmailClient:
                 path = save_dir / f"{idx:02d}.jpg"
                 path.write_bytes(img_bytes)
                 image_paths.append(str(path))
+        elif images_ref and not self.image_save_dir:
+            _log.warning("[gmail] %d imagini extrase dar image_save_dir=None — nu se salvează", len(images_ref))
+
+        _log.info("[gmail] msg=%s: %d caractere text, %d imagini, %d PDF-uri",
+                  msg_id, len(body_ref[0]), len(image_paths), len(names_ref))
 
         return EmailMessage(
             gmail_id=msg_id,
@@ -133,8 +141,12 @@ class GmailClient:
     ) -> None:
         mime = payload.get("mimeType", "")
         body = payload.get("body", {})
+        fn = payload.get("filename")
+        _log.debug("[walk] mime=%-30s fn=%-30s data=%s att=%s size=%s",
+                   mime, fn, bool(body.get("data")), bool(body.get("attachmentId")),
+                   body.get("size", 0))
 
-        if mime == "text/plain" and not payload.get("filename"):
+        if mime == "text/plain" and not fn:
             data = body.get("data", "")
             if data:
                 body_ref[0] += base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
@@ -142,11 +154,13 @@ class GmailClient:
         elif mime.startswith("image/"):
             raw = self._get_part_bytes(body, msg_id)
             if raw:
+                _log.debug("[gmail] imagine extrasă: %s (%d bytes brut)", fn or mime, len(raw))
                 images_ref.append(_resize_image(raw))
+            else:
+                _log.warning("[gmail] imagine fără date: %s", fn or mime)
 
-        elif mime == "application/pdf" or (payload.get("filename") or "").lower().endswith(".pdf"):
-            fn = payload.get("filename") or "document.pdf"
-            names_ref.append(fn)
+        elif mime == "application/pdf" or (fn or "").lower().endswith(".pdf"):
+            names_ref.append(fn or "document.pdf")
 
         for part in payload.get("parts", []):
             self._walk_parts(part, body_ref, images_ref, names_ref, msg_id)

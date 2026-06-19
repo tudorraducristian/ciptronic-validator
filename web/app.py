@@ -15,6 +15,9 @@ from fastapi.templating import Jinja2Templates
 from PIL import Image, ImageChops
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+import logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
 # Load .env so ANTHROPIC_API_KEY is available even when the app is imported
 # directly (uvicorn web.app:app, tests) without going through main.py.
 load_dotenv()
