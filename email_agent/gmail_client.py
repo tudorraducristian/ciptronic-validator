@@ -1,4 +1,5 @@
 import base64
+import io
 import os
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -8,6 +9,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from PIL import Image
 
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
@@ -20,6 +22,16 @@ class EmailMessage:
     subject: str
     body_text: str
     date: str  # RFC 2822 date string din header
+    image_paths: list[str] = field(default_factory=list)
+    other_attachment_names: list[str] = field(default_factory=list)
+
+
+def _resize_image(data: bytes, max_px: int = 1024) -> bytes:
+    img = Image.open(io.BytesIO(data))
+    img.thumbnail((max_px, max_px), Image.LANCZOS)
+    out = io.BytesIO()
+    img.convert("RGB").save(out, format="JPEG", quality=85)
+    return out.getvalue()
 
 
 @dataclass
@@ -46,6 +58,11 @@ class GmailClient:
                 creds = flow.run_local_server(port=0)
             Path(self.token_path).write_text(creds.to_json())
         return build("gmail", "v1", credentials=creds)
+
+    def get_address(self) -> str:
+        """Email address of the authorized account (userId='me')."""
+        profile = self._service.users().getProfile(userId="me").execute()
+        return profile.get("emailAddress", "")
 
     def fetch_emails(self, date_start: str, date_end: str) -> list[EmailMessage]:
         """Returnează emailurile primite între date_start și date_end (format YYYY-MM-DD)."""
@@ -82,3 +99,22 @@ class GmailClient:
                 body_ref[0] += base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
         for part in payload.get("parts", []):
             self._walk_parts(part, body_ref)
+
+
+def authorized_address(token_path: str = "gmail_token.json") -> str | None:
+    """Email of the already-authorized Gmail account, or None when not yet
+    authorized / unavailable. Never starts the interactive OAuth flow, so it is
+    safe to call on a normal page load."""
+    try:
+        if not Path(token_path).exists():
+            return None
+        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        if not creds.valid:
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                return None
+        service = build("gmail", "v1", credentials=creds)
+        return service.users().getProfile(userId="me").execute().get("emailAddress")
+    except Exception:
+        return None
