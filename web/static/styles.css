@@ -1348,3 +1348,26 @@ a:hover { color: var(--c-accent); }
   cursor: pointer;
 }
 .email-thumb:hover { opacity: 0.85; }
+
+/* ── email fetch button — loading state ─────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.email-fetch-btn__loading { display: none; }
+.email-fetch-form.htmx-request .email-fetch-btn__label { display: none; }
+.email-fetch-form.htmx-request .email-fetch-btn__loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

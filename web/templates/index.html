@@ -6,25 +6,36 @@
 
     <section class="email-fetch-section">
       <h2>Cereri din e-mail</h2>
+      {% if connected_email %}
+      <p class="muted" style="margin: 0 0 var(--s-3); font-size: 13px;">
+        Cont conectat: <strong>{{ connected_email }}</strong>
+      </p>
+      {% else %}
+      <p class="muted" style="margin: 0 0 var(--s-3); font-size: 13px;">
+        Niciun cont Gmail conectat — autorizarea se cere la prima verificare.
+      </p>
+      {% endif %}
       <form
         hx-post="/email-agent/fetch"
         hx-target="#email-results"
         hx-swap="innerHTML"
-        hx-indicator="#email-fetch-spinner"
+        hx-disabled-elt="find button[type='submit']"
         class="email-fetch-form"
       >
         <label>
           De la
-          <input type="date" name="date_start" required>
+          <input type="date" name="date_start" value="{{ default_date_start }}" required>
         </label>
         <label>
           Până la
-          <input type="date" name="date_end" required>
+          <input type="date" name="date_end" value="{{ default_date_end }}" required>
         </label>
-        <button type="submit" class="btn btn--primary">
-          Verifică cereri pe e-mail
+        <button type="submit" class="btn btn--primary email-fetch-btn">
+          <span class="email-fetch-btn__label">Verifică cereri pe e-mail</span>
+          <span class="email-fetch-btn__loading" aria-hidden="true">
+            <span class="spinner"></span>Se verifică…
+          </span>
         </button>
-        <span id="email-fetch-spinner" class="htmx-indicator">Se încarcă…</span>
       </form>
       <div id="email-results" style="margin-top: var(--s-5);"></div>
     </section>
