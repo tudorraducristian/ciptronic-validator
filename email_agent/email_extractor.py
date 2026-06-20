@@ -34,9 +34,11 @@ IMPORTANT:
 
 _SYSTEM_PROMPT_WITH_IMAGES = _SYSTEM_PROMPT_BASE + """
 
-Emailul conține imagini cu mockup-uri de produs. Folosește-le pentru a completa câmpurile vizuale: \
-culoare_principala, branding.pozitie, branding.culori. \
-Informațiile extrase din imagini au prioritate față de absența lor din text."""
+Emailul conține imagini cu mockup-uri de produs. Folosește-le DOAR pentru câmpurile vizuale \
+(culoare_principala, branding.pozitie, branding.culori) care NU sunt menționate explicit în textul emailului.
+
+PRIORITATE: textul emailului are întotdeauna prioritate față de imagini. \
+Dacă există o contradicție între ce scrie clientul și ce arată imaginea, folosește valoarea din text."""
 
 
 @dataclass
