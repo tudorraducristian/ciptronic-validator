@@ -83,10 +83,12 @@ def extract(message: EmailMessage, llm: LLMClient) -> list[ProductRequest]:
         "data": message.date,
         "corp_email": message.body_text[:3000],
     }
+    # Numele atașamentelor non-imagine (PDF etc.) ajung la LLM indiferent de
+    # ramură — un email cu doar PDF-uri tot poartă informație utilă în nume.
+    if message.other_attachment_names:
+        user_content_dict["fisiere_atasate"] = message.other_attachment_names
 
     if message.image_paths:
-        if message.other_attachment_names:
-            user_content_dict["fisiere_atasate"] = message.other_attachment_names
         text_block = {"type": "text", "text": json.dumps(user_content_dict, ensure_ascii=False)}
         image_blocks = [b for p in message.image_paths if (b := _image_block(p)) is not None]
         raw = llm.complete_vision(

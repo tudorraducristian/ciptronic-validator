@@ -201,6 +201,18 @@ def test_extract_vision_includes_pdf_names_in_text(tmp_path):
     assert "Logo ECJ.pdf" in text_block["text"]
 
 
+def test_extract_text_branch_includes_pdf_names_when_no_images():
+    """Email cu doar PDF-uri (fără imagini) → numele atașamentelor ajung
+    totuși la LLM pe ramura text."""
+    llm = _FakeLLMBoth("[]")
+    msg = _make_email("comandă cu specificații în PDF atașat")
+    msg.other_attachment_names = ["Comanda ECJ.pdf"]
+    email_extractor.extract(msg, llm)
+    assert len(llm.text_calls) == 1
+    _, user = llm.text_calls[0]
+    assert "Comanda ECJ.pdf" in user
+
+
 def test_extract_vision_image_block_is_base64_jpeg(tmp_path):
     llm = _FakeLLMBoth("[]")
     email_extractor.extract(_make_email_with_images(tmp_path), llm)
