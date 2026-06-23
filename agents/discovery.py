@@ -51,6 +51,22 @@ def parse_response(text: str) -> DiscoveryStep:
     return DiscoveryStep(state=data["state"], intrebari=data["intrebari"], done=data["done"])
 
 
+_RETRY_HINT = "\n\nRăspunde STRICT cu JSON valid, fără text suplimentar."
+
+
+def request_step(llm, system: str, user: str) -> DiscoveryStep:
+    """Cere un pas Discovery de la LLM și parsează-l. La eșec de parsare,
+    reîncearcă O SINGURĂ dată cu un hint de JSON strict, apoi propagă ValueError.
+
+    Contract din spec: o reîncercare cu hint, a doua eșuare → ridică."""
+    raw = llm.complete_text(system=system, user=user)
+    try:
+        return parse_response(raw)
+    except ValueError:
+        raw = llm.complete_text(system=system, user=user + _RETRY_HINT)
+        return parse_response(raw)
+
+
 def is_schema_complete(schema: dict, state: dict) -> tuple[bool, list[str]]:
     applicable = loader.applicable_leaf_keys(schema, state)
     missing: list[str] = []

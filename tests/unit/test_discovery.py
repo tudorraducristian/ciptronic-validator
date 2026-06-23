@@ -110,6 +110,47 @@ def test_merge_answers_returns_new_dict_without_mutating_input():
     assert new_state["material"] == "bumbac"
 
 
+class _ScriptedLLM:
+    """LLM fals care întoarce pe rând răspunsurile din listă și înregistrează
+    fiecare user prompt primit."""
+    def __init__(self, responses: list[str]):
+        self._responses = list(responses)
+        self.user_prompts: list[str] = []
+
+    def complete_text(self, system: str, user: str) -> str:
+        self.user_prompts.append(user)
+        return self._responses.pop(0)
+
+
+def test_request_step_returns_step_on_first_valid_response(schema_tricou):
+    raw = (FIXTURES / "discovery_round1.json").read_text(encoding="utf-8")
+    llm = _ScriptedLLM([raw])
+    step = discovery.request_step(llm, system="sys", user="usr")
+    assert step.done is False
+    assert step.state["culoare_principala"] == "albastru navy"
+    assert len(llm.user_prompts) == 1  # niciun retry când primul răspuns e valid
+
+
+def test_request_step_retries_once_with_hint_then_succeeds(schema_tricou):
+    bad = (FIXTURES / "discovery_invalid.txt").read_text(encoding="utf-8")
+    good = (FIXTURES / "discovery_round1.json").read_text(encoding="utf-8")
+    llm = _ScriptedLLM([bad, good])
+    step = discovery.request_step(llm, system="sys", user="usr")
+    assert step.state["culoare_principala"] == "albastru navy"
+    assert len(llm.user_prompts) == 2  # exact o reîncercare
+    # a doua cerere conține hint-ul de JSON strict
+    assert "JSON" in llm.user_prompts[1]
+    assert llm.user_prompts[1] != llm.user_prompts[0]
+
+
+def test_request_step_raises_after_second_failure():
+    bad = (FIXTURES / "discovery_invalid.txt").read_text(encoding="utf-8")
+    llm = _ScriptedLLM([bad, bad])
+    with pytest.raises(ValueError, match="JSON"):
+        discovery.request_step(llm, system="sys", user="usr")
+    assert len(llm.user_prompts) == 2  # o singură reîncercare, apoi ridică
+
+
 def test_build_messages_returns_system_and_user_strings(schema_tricou):
     system, user = discovery.build_messages(
         schema=schema_tricou,

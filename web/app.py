@@ -158,8 +158,7 @@ def create_session(product_type: str = Form(...), initial_description: str = For
         schema=schema, initial_description=initial_description,
         state=initial_state, history=[],
     )
-    raw = llm.complete_text(system=system, user=user)
-    step = discovery.parse_response(raw)
+    step = discovery.request_step(llm, system=system, user=user)
 
     with get_conn() as conn:
         sid = repository.create_session(conn, product_type, initial_description)
@@ -235,8 +234,7 @@ async def submit_answers(session_id: str, request: Request):
             schema=schema, initial_description=row["initial_description"],
             state=merged_state, history=history,
         )
-        raw = llm.complete_text(system=system, user=user)
-        step = discovery.parse_response(raw)
+        step = discovery.request_step(llm, system=system, user=user)
 
         history.append({"round": next_round, "questions": step.intrebari, "answers": None})
         complete, _ = discovery.is_schema_complete(schema, step.state)
