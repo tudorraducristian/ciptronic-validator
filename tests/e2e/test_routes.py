@@ -47,6 +47,19 @@ def _create_session(client, fake_llm):
     return r.headers["HX-Redirect"]
 
 
+def test_create_session_invalid_llm_twice_returns_clear_error(client, fake_llm):
+    """Două răspunsuri LLM invalide la rând (după retry) → eroare clară către UI,
+    nu un 500 generic. Conform spec: a doua eșuare → mesaj clar."""
+    fake_llm.queue_text("nu e JSON, doar text")
+    fake_llm.queue_text("tot nu e JSON")
+    r = client.post(
+        "/sessions",
+        data={"product_type": "tricou", "initial_description": "tricou navy"},
+    )
+    assert r.status_code == 502
+    assert "Discovery" in r.json()["detail"]
+
+
 def test_create_session_returns_hx_redirect(client, fake_llm):
     fake_llm.queue_text((FIXTURES / "discovery_round1.json").read_text(encoding="utf-8"))
     r = client.post(
