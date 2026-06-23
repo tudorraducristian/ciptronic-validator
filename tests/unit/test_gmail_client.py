@@ -157,6 +157,48 @@ def test_walk_parts_ignores_image_without_data():
     assert images_ref == []
 
 
+def test_walk_parts_skips_corrupt_image_without_raising():
+    client = _make_client()
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {
+                "mimeType": "image/jpeg",
+                "filename": "corrupt.jpg",
+                "body": {"data": _b64(b"not a real image, just junk bytes")},
+            },
+        ],
+    }
+    body_ref, images_ref, names_ref = [""], [], []
+    # nu trebuie să arunce — imaginea coruptă e sărită, nu propagată
+    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    assert images_ref == []
+
+
+def test_walk_parts_corrupt_image_does_not_block_valid_sibling():
+    client = _make_client()
+    payload = {
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {
+                "mimeType": "image/jpeg",
+                "filename": "corrupt.jpg",
+                "body": {"data": _b64(b"junk")},
+            },
+            {
+                "mimeType": "image/png",
+                "filename": "good.png",
+                "body": {"data": _b64(_png_bytes(40, 40))},
+            },
+        ],
+    }
+    body_ref, images_ref, names_ref = [""], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    # imaginea validă e colectată chiar dacă fratele ei e corupt
+    assert len(images_ref) == 1
+    assert Image.open(BytesIO(images_ref[0])).format == "JPEG"
+
+
 # ── _fetch_and_parse ──────────────────────────────────────────────────────────
 
 def _gmail_message_payload(text: bytes, img_bytes: bytes | None = None) -> dict:

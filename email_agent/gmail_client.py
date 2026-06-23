@@ -154,8 +154,15 @@ class GmailClient:
         elif mime.startswith("image/"):
             raw = self._get_part_bytes(body, msg_id)
             if raw:
-                _log.debug("[gmail] imagine extrasă: %s (%d bytes brut)", fn or mime, len(raw))
-                images_ref.append(_resize_image(raw))
+                try:
+                    resized = _resize_image(raw)
+                except Exception as exc:
+                    # Imagine coruptă / format nesuportat / bombă de decompresie:
+                    # sare peste atașament în loc să blocheze tot fetch-ul.
+                    _log.warning("[gmail] imagine ilizibilă, omisă: %s — %s", fn or mime, exc)
+                else:
+                    _log.debug("[gmail] imagine extrasă: %s (%d bytes brut)", fn or mime, len(raw))
+                    images_ref.append(resized)
             else:
                 _log.warning("[gmail] imagine fără date: %s", fn or mime)
 
