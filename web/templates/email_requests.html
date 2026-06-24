@@ -46,7 +46,12 @@
       </span>
       {% endif %}
 
-      <p class="request-card__desc">„{{ req.description }}"</p>
+      <p class="request-card__desc">
+        „{{ req.description }}"
+        {% if group.email.other_attachment_names %}
+        <span class="badge-pdf" title="{{ group.email.other_attachment_names | join(', ') }}">📄 din PDF</span>
+        {% endif %}
+      </p>
 
       <div class="field-chips">
         {% for key, val in req.prefilled_state.items() %}
