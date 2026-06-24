@@ -105,8 +105,8 @@ def test_walk_parts_collects_text():
             {"mimeType": "text/plain", "body": {"data": _b64(b"hello email")}, "filename": None},
         ],
     }
-    body_ref, images_ref, names_ref = [""], [], []
-    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    body_ref, images_ref, names_ref, pdf_bytes_ref = [""], [], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, pdf_bytes_ref, "msg-1")
     assert body_ref[0] == "hello email"
 
 
@@ -123,8 +123,8 @@ def test_walk_parts_collects_image():
             },
         ],
     }
-    body_ref, images_ref, names_ref = [""], [], []
-    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    body_ref, images_ref, names_ref, pdf_bytes_ref = [""], [], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, pdf_bytes_ref, "msg-1")
     assert len(images_ref) == 1
     img = Image.open(BytesIO(images_ref[0]))
     assert img.format == "JPEG"
@@ -138,8 +138,8 @@ def test_walk_parts_collects_pdf_name():
             {"mimeType": "application/pdf", "filename": "logo.pdf", "body": {}},
         ],
     }
-    body_ref, images_ref, names_ref = [""], [], []
-    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    body_ref, images_ref, names_ref, pdf_bytes_ref = [""], [], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, pdf_bytes_ref, "msg-1")
     assert names_ref == ["logo.pdf"]
     assert images_ref == []
 
@@ -152,8 +152,8 @@ def test_walk_parts_ignores_image_without_data():
             {"mimeType": "image/jpeg", "filename": "empty.jpg", "body": {}},
         ],
     }
-    body_ref, images_ref, names_ref = [""], [], []
-    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    body_ref, images_ref, names_ref, pdf_bytes_ref = [""], [], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, pdf_bytes_ref, "msg-1")
     assert images_ref == []
 
 
@@ -169,9 +169,9 @@ def test_walk_parts_skips_corrupt_image_without_raising():
             },
         ],
     }
-    body_ref, images_ref, names_ref = [""], [], []
+    body_ref, images_ref, names_ref, pdf_bytes_ref = [""], [], [], []
     # nu trebuie să arunce — imaginea coruptă e sărită, nu propagată
-    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    client._walk_parts(payload, body_ref, images_ref, names_ref, pdf_bytes_ref, "msg-1")
     assert images_ref == []
 
 
@@ -192,8 +192,8 @@ def test_walk_parts_corrupt_image_does_not_block_valid_sibling():
             },
         ],
     }
-    body_ref, images_ref, names_ref = [""], [], []
-    client._walk_parts(payload, body_ref, images_ref, names_ref, "msg-1")
+    body_ref, images_ref, names_ref, pdf_bytes_ref = [""], [], [], []
+    client._walk_parts(payload, body_ref, images_ref, names_ref, pdf_bytes_ref, "msg-1")
     # imaginea validă e colectată chiar dacă fratele ei e corupt
     assert len(images_ref) == 1
     assert Image.open(BytesIO(images_ref[0])).format == "JPEG"

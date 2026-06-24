@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
+from email_agent import pdf_extractor as _pdf_extractor
+
 _log = logging.getLogger(__name__)
 
 from google.auth.transport.requests import Request
@@ -27,6 +29,8 @@ class EmailMessage:
     date: str  # RFC 2822 date string din header
     image_paths: list[str] = field(default_factory=list)
     other_attachment_names: list[str] = field(default_factory=list)
+    pdf_texts: list[str] = field(default_factory=list)
+    pdf_image_paths: list[str] = field(default_factory=list)
 
 
 def _resize_image(data: bytes, max_px: int = 1024) -> bytes:
@@ -105,21 +109,41 @@ class GmailClient:
         body_ref: list[str] = [""]
         images_ref: list[bytes] = []
         names_ref: list[str] = []
-        self._walk_parts(msg["payload"], body_ref, images_ref, names_ref, msg_id)
+        pdf_bytes_ref: list[bytes] = []
+        self._walk_parts(msg["payload"], body_ref, images_ref, names_ref, pdf_bytes_ref, msg_id)
 
-        image_paths: list[str] = []
-        if images_ref and self.image_save_dir:
+        save_dir = None
+        if self.image_save_dir:
             save_dir = Path(self.image_save_dir) / Path(msg_id).name
             save_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save email images
+        image_paths: list[str] = []
+        if images_ref and save_dir:
             for idx, img_bytes in enumerate(images_ref):
                 path = save_dir / f"{idx:02d}.jpg"
                 path.write_bytes(img_bytes)
                 image_paths.append(str(path))
-        elif images_ref and not self.image_save_dir:
+        elif images_ref:
             _log.warning("[gmail] %d imagini extrase dar image_save_dir=None — nu se salvează", len(images_ref))
 
-        _log.info("[gmail] msg=%s: %d caractere text, %d imagini, %d PDF-uri",
-                  msg_id, len(body_ref[0]), len(image_paths), len(names_ref))
+        # Extract and save PDF content
+        pdf_texts: list[str] = []
+        pdf_image_paths: list[str] = []
+        for pdf_idx, pdf_bytes in enumerate(pdf_bytes_ref):
+            text, pdf_images = _pdf_extractor.extract_pdf(pdf_bytes)
+            if text:
+                pdf_texts.append(text)
+            if pdf_images and save_dir:
+                for img_idx, jpeg_bytes in enumerate(pdf_images):
+                    path = save_dir / f"pdf_{pdf_idx:02d}_{img_idx:02d}.jpg"
+                    path.write_bytes(jpeg_bytes)
+                    pdf_image_paths.append(str(path))
+            elif pdf_images:
+                _log.warning("[gmail] %d imagini PDF extrase dar image_save_dir=None", len(pdf_images))
+
+        _log.info("[gmail] msg=%s: %d ch text, %d img email, %d PDF-uri, %d img PDF",
+                  msg_id, len(body_ref[0]), len(image_paths), len(pdf_bytes_ref), len(pdf_image_paths))
 
         return EmailMessage(
             gmail_id=msg_id,
@@ -129,6 +153,8 @@ class GmailClient:
             date=headers.get("Date", ""),
             image_paths=image_paths,
             other_attachment_names=names_ref,
+            pdf_texts=pdf_texts,
+            pdf_image_paths=pdf_image_paths,
         )
 
     def _walk_parts(
@@ -137,6 +163,7 @@ class GmailClient:
         body_ref: list[str],
         images_ref: list[bytes],
         names_ref: list[str],
+        pdf_bytes_ref: list[bytes],
         msg_id: str,
     ) -> None:
         mime = payload.get("mimeType", "")
@@ -168,9 +195,14 @@ class GmailClient:
 
         elif mime == "application/pdf" or (fn or "").lower().endswith(".pdf"):
             names_ref.append(fn or "document.pdf")
+            raw = self._get_part_bytes(body, msg_id)
+            if raw:
+                pdf_bytes_ref.append(raw)
+            else:
+                _log.warning("[gmail] PDF fără date: %s", fn or "document.pdf")
 
         for part in payload.get("parts", []):
-            self._walk_parts(part, body_ref, images_ref, names_ref, msg_id)
+            self._walk_parts(part, body_ref, images_ref, names_ref, pdf_bytes_ref, msg_id)
 
 
 def authorized_address(token_path: str = "gmail_token.json") -> str | None:
