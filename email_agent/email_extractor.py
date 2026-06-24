@@ -98,9 +98,12 @@ def extract(message: EmailMessage, llm: LLMClient) -> list[ProductRequest]:
     # Merge email images with PDF images
     all_image_paths = list(getattr(message, "image_paths", [])) + list(getattr(message, "pdf_image_paths", []))
 
+    image_blocks: list[dict] = []
     if all_image_paths:
         text_block = {"type": "text", "text": json.dumps(user_content_dict, ensure_ascii=False)}
         image_blocks = [b for p in all_image_paths if (b := _image_block(p)) is not None]
+
+    if image_blocks:
         raw = llm.complete_vision(
             system=_SYSTEM_PROMPT_WITH_IMAGES,
             content_blocks=[text_block] + image_blocks,
