@@ -75,22 +75,32 @@ def extract(message: EmailMessage, llm: LLMClient) -> list[ProductRequest]:
         schemas_map[ptype] = schema
         schemas_text += f'\nSchema pentru "{ptype}":\n{_schema_to_text(schema)}\n'
 
+    # Merge email body with PDF text content
+    body_parts = [message.body_text[:3000]]
+    for pdf_text in getattr(message, "pdf_texts", []):
+        if pdf_text.strip():
+            body_parts.append(f"\n\n--- Conținut PDF ---\n{pdf_text}")
+    full_body = "".join(body_parts)
+
     user_content_dict = {
         "tipuri_disponibile": available_types,
         "scheme": schemas_text,
         "expeditor": message.sender,
         "subiect": message.subject,
         "data": message.date,
-        "corp_email": message.body_text[:3000],
+        "corp_email": full_body,
     }
     # Numele atașamentelor non-imagine (PDF etc.) ajung la LLM indiferent de
     # ramură — un email cu doar PDF-uri tot poartă informație utilă în nume.
     if message.other_attachment_names:
         user_content_dict["fisiere_atasate"] = message.other_attachment_names
 
-    if message.image_paths:
+    # Merge email images with PDF images
+    all_image_paths = list(getattr(message, "image_paths", [])) + list(getattr(message, "pdf_image_paths", []))
+
+    if all_image_paths:
         text_block = {"type": "text", "text": json.dumps(user_content_dict, ensure_ascii=False)}
-        image_blocks = [b for p in message.image_paths if (b := _image_block(p)) is not None]
+        image_blocks = [b for p in all_image_paths if (b := _image_block(p)) is not None]
         raw = llm.complete_vision(
             system=_SYSTEM_PROMPT_WITH_IMAGES,
             content_blocks=[text_block] + image_blocks,

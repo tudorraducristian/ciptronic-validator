@@ -122,6 +122,31 @@ def test_create_session_has_prefilled_state(client, fake_llm):
 
 # ── ruta /email-agent/image/ ──────────────────────────────────────────────────
 
+def test_fetch_includes_pdf_text(client, fake_llm, monkeypatch):
+    """PDF text should reach the LLM and contribute to prefilled_state."""
+    from web import app as web_app
+
+    msg = EmailMessage(
+        gmail_id="gid-pdf",
+        sender="Client <client@test.ro>",
+        subject="Cerere tricou",
+        body_text="va trimit detalii in PDF",
+        date="Mon, 23 Jun 2026 10:00:00 +0300",
+        pdf_texts=["tricou negru guler rotund material bumbac"],
+    )
+    monkeypatch.setattr(web_app, "get_gmail_client", lambda: FakeGmail([msg]))
+    fake_llm.queue_text(json.dumps([{
+        "product_type": "tricou",
+        "description": "tricou negru guler rotund",
+        "prefilled_state": {"culoare_principala": "negru", "guler": "rotund"},
+    }]))
+    r = client.post("/email-agent/fetch", data={"date_start": "2026-06-23", "date_end": "2026-06-23"})
+    assert r.status_code == 200
+    assert "negru" in r.text
+
+
+# ── ruta /email-agent/image/ ──────────────────────────────────────────────────
+
 def test_email_image_route_returns_file(client):
     from web import app as web_app
     from PIL import Image
